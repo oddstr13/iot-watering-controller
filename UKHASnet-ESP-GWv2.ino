@@ -4,10 +4,12 @@
 
 #include <Ticker.h>
 
-#include <UKHASnetRFM69-config.h>
+// 
+#include "radio_config.h"
 #include <UKHASnetRFM69.h>
 
 #include <Buffer.h>
+#include <iso646.h>
 
 const char* ssid = "SSID";
 const char* password = "PASSWORD";
@@ -15,8 +17,12 @@ const char* password = "PASSWORD";
 const char* node_id = "NODENAME";
 const char* api_url = "http://www.ukhas.net/api/upload";
 
-int rfmCSPin = D8;
-int rfmResetPin = D0;
+volatile bool transmitting_packet = false;
+const int rfm_dio1 = 2;
+
+
+int rfmCSPin = 0;
+int rfmResetPin = 15;
 
 int ukh_seq = 0;
 
@@ -66,25 +72,26 @@ void setup() {
 
 
 bool packet_received = false;
-uint8_t databuf[70];
+#define databuf_LEN 1032
+uint8_t databuf[databuf_LEN];
 uint8_t dataptr = 0;
 int16_t lastrssi = 0;
 
 WiFiClientSecure client;
 
-
+#define uploadbuf_LEN 1500
 Buffer uploadbuf;
-uint8_t __uploadbuf[256];
+uint8_t __uploadbuf[uploadbuf_LEN];
 HTTPClient http;
 
 void upload() {
     if (not uploadbuf.size) {
-        uploadbuf.setBuffer(__uploadbuf, 256); \
-        //BUFFER_INIT(uploadbuf, 256);
+        uploadbuf.setBuffer(__uploadbuf, uploadbuf_LEN); \
+        //BUFFER_INIT(uploadbuf, uploadbuf_LEN);
     }
     Serial.println("Uploading...");
-    http.begin(api_url);
-    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    //http.begin(api_url);
+    //http.addHeader("Content-Type", "application/x-www-form-urlencoded");
 
     uploadbuf.reset();
     uploadbuf.addString("origin=");
@@ -92,10 +99,24 @@ void upload() {
     uploadbuf.addString("&data=");
 
     // TODO: url escape.
-    uploadbuf.addCharArray((char*)databuf, dataptr-1);
+    //uploadbuf.addCharArray((char*)databuf, dataptr-1);
     //for (int i = 0; i < len-1; i++){
     //    uploadPacket += char(buf[i]); //copy the packet from the buffer we got from rf69.recv into our upload string. There may be neater ways of doing this.
     //}
+    char c;
+    for (unsigned int i=0; i<dataptr-1; i++) {
+        c = databuf[i];
+        if (c == 45 or c == 46 or c == 95 or c == 126
+            or (48 <= c and c <= 58)
+            or (65 <= c and c <= 90)
+            or (97 <= c and c <= 122)) {
+            uploadbuf.addByte(c);
+        } else {
+            uploadbuf.addByte('%');
+            uploadbuf.addByte(BASE16[(c & 0xf0) >> 4]);
+            uploadbuf.addByte(BASE16[ c & 0x0f]);
+        }
+    }
 
     uploadbuf.addString("&rssi=");
     uploadbuf.addString(String(lastrssi));
@@ -104,10 +125,10 @@ void upload() {
     Serial.write(uploadbuf.buf, uploadbuf.ptr-1);
     Serial.println();
 
-    http.POST((const char*)uploadbuf.buf);
+    //http.POST((const char*)uploadbuf.buf);
 
-    http.writeToStream(&Serial);
-    http.end();
+    //http.writeToStream(&Serial);
+    //http.end();
     Serial.println();
 }
 
