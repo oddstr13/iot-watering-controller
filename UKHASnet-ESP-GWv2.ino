@@ -6,7 +6,7 @@
 
 // 
 #include "radio_config.h"
-#include <UKHASnetRFM69.h>
+#include "ukhasnet-rfm69/UKHASnetRFM69.h"
 
 #include <Buffer.h>
 #include <iso646.h>

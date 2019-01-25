@@ -1,0 +1,4 @@
+[submodule "ukhasnet-rfm69"]
+	path = ukhasnet-rfm69
+	url = https://github.com/oddstr13/ukhasnet-rfm69
+	branch = arduino3
