@@ -6,7 +6,7 @@
 
 // 
 #include "radio_config.h"
-#include "ukhasnet-rfm69/UKHASnetRFM69.h"
+#include <UKHASnetRFM69.h>
 
 #include <Buffer.h>
 #include <iso646.h>
@@ -45,7 +45,7 @@ rfm_status_t resetRadio() {
     Serial.print("RFM69 status: ");
     Serial.println(rfm_status);
     delay(200);
-    //rf69_burst_write(RFM69_REG_07_FRF_MSB, (rfm_reg_t*)"\xD9\x60\x12", 3);
+    ////rf69_burst_write(RFM69_REG_07_FRF_MSB, (rfm_reg_t*)"\xD9\x60\x12", 3);
     dump_rfm69_registers();
 
     return rfm_status;
@@ -74,8 +74,8 @@ void setup() {
 bool packet_received = false;
 #define databuf_LEN 1032
 uint8_t databuf[databuf_LEN];
-uint8_t dataptr = 0;
-int16_t lastrssi = 0;
+uint16_t dataptr = 0;
+float lastrssi = 0;
 
 WiFiClientSecure client;
 
@@ -84,27 +84,26 @@ Buffer uploadbuf;
 uint8_t __uploadbuf[uploadbuf_LEN];
 HTTPClient http;
 
-void upload() {
+void upload(bool fake=false);
+void upload(bool fake) {
     if (not uploadbuf.size) {
         uploadbuf.setBuffer(__uploadbuf, uploadbuf_LEN); \
-        //BUFFER_INIT(uploadbuf, uploadbuf_LEN);
+        ////BUFFER_INIT(uploadbuf, uploadbuf_LEN);
     }
-    Serial.println("Uploading...");
-    //http.begin(api_url);
-    //http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    if (not fake) {
+        Serial.println("Uploading...");
+        http.begin(api_url);
+        http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    }
 
     uploadbuf.reset();
     uploadbuf.addString("origin=");
-    uploadbuf.addString(node_id); //gateway nodes ID
+    uploadbuf.addString(node_id); //gateway nodes (our) ID
     uploadbuf.addString("&data=");
 
-    // TODO: url escape.
-    //uploadbuf.addCharArray((char*)databuf, dataptr-1);
-    //for (int i = 0; i < len-1; i++){
-    //    uploadPacket += char(buf[i]); //copy the packet from the buffer we got from rf69.recv into our upload string. There may be neater ways of doing this.
-    //}
+    // Escape packet for upload
     char c;
-    for (unsigned int i=0; i<dataptr-1; i++) {
+    for (unsigned int i=0; i<dataptr; i++) {
         c = databuf[i];
         if (c == 45 or c == 46 or c == 95 or c == 126
             or (48 <= c and c <= 58)
@@ -125,20 +124,90 @@ void upload() {
     Serial.write(uploadbuf.buf, uploadbuf.ptr-1);
     Serial.println();
 
-    //http.POST((const char*)uploadbuf.buf);
+    if (not fake) {
+        http.POST((const char*)uploadbuf.buf);
 
-    //http.writeToStream(&Serial);
-    //http.end();
+        http.writeToStream(&Serial);
+        http.end();
+    }
+
     Serial.println();
 }
 
+/**
+ * Checks if buf matches minimum requirements for UKHASnet packet.
+ * @param buf A pointer to buffer to test content of
+ * @param len Length of packet in buffer
+ * @returns true if matching, false if not.
+ */
+bool isUkhasnetPacket(uint8_t *buf, uint16_t len) {
+    //! Minimum packet to pass: 0a[Q]
+    //* Path can contain any character and be any length.
+    //* Data field validity (or existence) not tested.
+    // Minimum length
+    if (len < 5) { // 0a[Q]
+        return false;
+    }
+
+    // TTL:
+    if (buf[0] < '0' or buf[0] > '9') {
+        return false;
+    }
+
+    // Sequence:
+    if (buf[1] < 'a' or buf[1] > 'z') {
+        return false;
+    }
+
+    /*
+     Packet:    9aV3.3[Q]
+     i:         012345678
+     len:       123456789
+    */
+    // Hops
+    if (buf[len-1] != ']') {
+        return false;
+    }
+    // 9a V3.3[ Q]
+    bool found = false;
+    for (uint16_t i=len-2; i>1; i--) {
+        if (buf[i] == '[') {
+            found = true;
+            break;
+        }
+    }
+    if (not found) {
+        return false;
+    }
+
+    return true;
+}
+
+rfm_status_t res;
 void loop() {
-    rf69_receive(databuf, &dataptr, &lastrssi, &packet_received);
-    if (packet_received) {
-        Serial.println((float)lastrssi);
-        Serial.write(databuf, dataptr-1);
-        Serial.println();
-        upload();
+    res = rf69_receive_long(databuf, &dataptr, &lastrssi, &packet_received, databuf_LEN, DIO1_pin);
+
+    if (res == RFM_OK) {
+        Serial.print("Result: ");
+        Serial.println(res, DEC);
+
+        Serial.print("RSSI: ");
+        Serial.println(lastrssi);
+
+        Serial.print("Bytes: ");
+        Serial.println(dataptr, DEC);
+
+        Serial.print("Waiting: ");
+        Serial.println(packet_received ? "true" : "false");
+
+        if (isUkhasnetPacket(databuf, dataptr)) {
+            Serial.write(databuf, dataptr);
+            Serial.println();
+            upload();
+        } else {
+            upload(true);
+        }
+
     }
 }
 
