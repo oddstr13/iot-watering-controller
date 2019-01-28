@@ -103,9 +103,9 @@ void upload(bool fake) {
     }
 
     uploadbuf.reset();
-    uploadbuf.addString("origin=");
-    uploadbuf.addString(node_id); //gateway nodes (our) ID
-    uploadbuf.addString("&data=");
+    uploadbuf.add("origin=");
+    uploadbuf.add(node_id); //gateway nodes (our) ID
+    uploadbuf.add("&data=");
 
     // Escape packet for upload
     char c;
@@ -115,19 +115,19 @@ void upload(bool fake) {
             or (48 <= c and c <= 58)
             or (65 <= c and c <= 90)
             or (97 <= c and c <= 122)) {
-            uploadbuf.addByte(c);
+            uploadbuf.add(c);
         } else {
-            uploadbuf.addByte('%');
-            uploadbuf.addByte(BASE16[(c & 0xf0) >> 4]);
-            uploadbuf.addByte(BASE16[ c & 0x0f]);
+            uploadbuf.add('%');
+            uploadbuf.add(BASE16[(c & 0xf0) >> 4]);
+            uploadbuf.add(BASE16[ c & 0x0f]);
         }
     }
 
     if (lastrssi < -0.5) {
-        uploadbuf.addString("&rssi=");
-        uploadbuf.addString(String(lastrssi));
+        uploadbuf.add("&rssi=");
+        uploadbuf.addNumber(lastrssi, 1, true);
     }
-    uploadbuf.addByte(0); //null terminate the string for safe keeping
+    uploadbuf.add('\0'); //null terminate the string for safe keeping
     
     Serial.write(uploadbuf.buf, uploadbuf.ptr-1);
     Serial.println();
@@ -201,28 +201,28 @@ void sendPacket() {
 
     sendbuf.reset();
 
-    sendbuf.addByte('9');
-    sendbuf.addByte(sequence + 98);
+    sendbuf.add('9');
+    sendbuf.add(sequence + 98);
 
     switch (sequence) {
         case -1: // 'a', boot packet.
-            sendbuf.addString(":reset=");
-            sendbuf.addString(ESP.getResetReason());
+            sendbuf.add(":reset=");
+            sendbuf.add(ESP.getResetReason());
             break;
         case 0:
             // TODO: implement (M)ode flag, and submit patches upstream.
-            sendbuf.addString("Z2"); // Non-standard. GW. 
+            sendbuf.add("Z2"); // Non-standard. GW. 
             break;
         case 1: // 'c'
-            //sendbuf.addString(); // TODO: Add Wifi based location.
+            //sendbuf.add('L'); // TODO: Add Wifi based location.
             break;
         default:
             break;
     }
 
-    sendbuf.addByte('[');
-    sendbuf.addString(node_id);
-    sendbuf.addByte(']');
+    sendbuf.add('[');
+    sendbuf.add(node_id);
+    sendbuf.add(']');
 
     // Copy buffer to databuf for upload.
     for (uint16_t i=0; i < sendbuf.ptr; i++) {
