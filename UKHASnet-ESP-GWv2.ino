@@ -51,6 +51,8 @@ rfm_status_t resetRadio() {
     return rfm_status;
 }
 
+unsigned long packet_timer;
+unsigned long PACKET_INTERVAL = 15*60*1000;
 void setup() {
     Serial.begin(115200);
     delay(200);
@@ -68,6 +70,8 @@ void setup() {
 
     // Setup UKHASnet
     resetRadio();
+    // Should make it transmit a packet right now, then next after PACKET_INTERVAL
+    packet_timer = millis() - PACKET_INTERVAL;
 }
 
 
@@ -86,6 +90,8 @@ HTTPClient http;
 
 void upload(bool fake=false);
 void upload(bool fake) {
+    yield();
+
     if (not uploadbuf.size) {
         uploadbuf.setBuffer(__uploadbuf, uploadbuf_LEN); \
         ////BUFFER_INIT(uploadbuf, uploadbuf_LEN);
@@ -117,8 +123,10 @@ void upload(bool fake) {
         }
     }
 
-    uploadbuf.addString("&rssi=");
-    uploadbuf.addString(String(lastrssi));
+    if (lastrssi < -0.5) {
+        uploadbuf.addString("&rssi=");
+        uploadbuf.addString(String(lastrssi));
+    }
     uploadbuf.addByte(0); //null terminate the string for safe keeping
     
     Serial.write(uploadbuf.buf, uploadbuf.ptr-1);
@@ -183,8 +191,71 @@ bool isUkhasnetPacket(uint8_t *buf, uint16_t len) {
     return true;
 }
 
+int sequence = -1;
+Buffer sendbuf;
+uint8_t __sendbuf[databuf_LEN];
+void sendPacket() {
+    if (not sendbuf.size) {
+        sendbuf.setBuffer(__sendbuf, databuf_LEN);
+    }
+
+    sendbuf.reset();
+
+    sendbuf.addByte('9');
+    sendbuf.addByte(sequence + 98);
+
+    switch (sequence) {
+        case -1: // 'a', boot packet.
+            sendbuf.addString(":reset=");
+            sendbuf.addString(ESP.getResetReason());
+            break;
+        case 0:
+            // TODO: implement (M)ode flag, and submit patches upstream.
+            sendbuf.addString("Z2"); // Non-standard. GW. 
+            break;
+        case 1: // 'c'
+            //sendbuf.addString(); // TODO: Add Wifi based location.
+            break;
+        default:
+            break;
+    }
+
+    sendbuf.addByte('[');
+    sendbuf.addString(node_id);
+    sendbuf.addByte(']');
+
+    // Copy buffer to databuf for upload.
+    for (uint16_t i=0; i < sendbuf.ptr; i++) {
+        databuf[i] = sendbuf.buf[i];
+    }
+    dataptr = sendbuf.ptr;
+    Serial.print("dataptr=");
+    Serial.println(dataptr, DEC);
+
+    // Upload packet.
+    lastrssi = 1;
+    upload();
+    Serial.println("Own packet uploaded, transmitting...");
+
+    Serial.write(sendbuf.buf, sendbuf.ptr);
+    Serial.println();
+
+    // Transmit packet. 10dBm (10mW)
+    rf69_send_long(sendbuf.buf, sendbuf.ptr, 10, DIO1_pin);
+
+    // Increment sequence for next time.
+    sequence = (sequence + 1) % 25;
+    //* Sequence goes 'b'-'z', with 'a' transmitted as first packet after boot. 
+}
+
 rfm_status_t res;
 void loop() {
+    if (getTimeSince(packet_timer) >= PACKET_INTERVAL) {
+        sendPacket();
+        packet_timer += PACKET_INTERVAL;
+    }
+
+    // TODO: Add timeout parameter to rf69_receive_long, to allow other tasks to run (outside of yield())
     res = rf69_receive_long(databuf, &dataptr, &lastrssi, &packet_received, databuf_LEN, DIO1_pin);
 
     if (res == RFM_OK) {
