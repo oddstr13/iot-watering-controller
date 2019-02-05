@@ -1,0 +1,22 @@
+TODO:
+  ☐ Configuration interface.
+  ☐ Multicast (or broadcast).
+  ☐ IPv6.
+  ☐ Add Wifi based location (On boot, or on configuration).
+
+  UKHASnet:
+    Implement (M)ode flag, and submit patches upstream:
+      Make sure to keep Grafana & InfluxDB in mind.
+      ☐ Implement Mode Flag
+      Upstream:
+        There could be more places that need patches, but here are the main ones.
+        ☐ Protocol definition - https://github.com/UKHASnet/protocol
+        Official website:
+          ☐ UKHASnet API Endpoint - https://github.com/UKHASnet-hub/upload-api-daemon
+          ☐ UKHASnet parser - https://github.com/UKHASnet-hub/parser
+        Rust parser & Grafana dashboard:
+          ☐ Rust parser - https://github.com/adamgreig/ukhasnet-parser
+          ☐ InfluxDB daemon - https://github.com/adamgreig/ukhasnet-influxdb
+
+  Radio interface:
+    ☐ Add timeout parameter to rf69_receive_long, to allow other tasks to run (outside of yield())
