@@ -11,15 +11,9 @@
 #include <Buffer.h>
 #include <iso646.h>
 
-const char* ssid = "SSID";
-const char* password = "PASSWORD";
-
-const char* node_id = "NODENAME";
-const char* api_url = "http://www.ukhas.net/api/upload";
+#include "node_config.h"
 
 volatile bool transmitting_packet = false;
-const int rfm_dio1 = 2;
-
 
 int rfmCSPin = 0;
 int rfmResetPin = 15;
