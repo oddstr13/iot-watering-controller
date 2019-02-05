@@ -5,16 +5,16 @@
             "includePath": [
                 "${workspaceRoot}",
                 "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\tools\\**",
-                "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.4.2\\**",
-                "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.4.2\\cores\\esp8266",
-                "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.4.2\\variants\\d1_mini",
+                "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.5.0-beta3\\**",
+                "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.5.0-beta3\\cores\\esp8266",
+                "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.5.0-beta3\\variants\\d1_mini",
                 "C:\\Users\\Odd\\Documents\\Arduino\\libraries\\**"
             ],
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,
                 "path": [
-                    "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.4.2\\cores\\esp8266",
-                    "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.4.2\\libraries",
+                    "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.5.0-beta3\\cores\\esp8266",
+                    "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.5.0-beta3\\libraries",
                     "C:\\Users\\Odd\\Documents\\Arduino\\libraries",
                     "${workspaceRoot}"
                 ]
