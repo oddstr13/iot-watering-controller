@@ -1,6 +1,8 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <WiFiUdp.h>
+#include <AddrList.h>
 
 #include <Ticker.h>
 
@@ -45,27 +47,85 @@ rfm_status_t resetRadio() {
     return rfm_status;
 }
 
+IPAddress getIP6Address(int ifn=STATION_IF) {
+    // Prefer non-local address
+    for (auto a: addrList) {
+        if (a.ifnumber() == ifn && a.addr().isV6() && !a.addr().isLocal()) {
+            return a.addr();
+        }
+    }
+
+    // Fall back to local address
+    for (auto a: addrList) {
+        if (a.ifnumber() == ifn && a.addr().isV6()) {
+            return a.addr();
+        }
+    }
+
+    // Final fall-back to the IPv6 wildcard address; [::]
+    return IP6_ADDR_ANY;
+}
+
+WiFiUDP Udp;
+IPAddress multicast_ip;
+
 unsigned long packet_timer;
 unsigned long PACKET_INTERVAL = 15*60*1000;
 void setup() {
     Serial.begin(115200);
     delay(200);
 
-    // Set up WiFi
     Serial.println();
+    // Set up WiFi
+    WiFi.mode(WIFI_STA); // Disable access point.
+    WiFi.softAPdisconnect(true);
+    WiFi.setSleepMode(WIFI_NONE_SLEEP); // Disable sleep (In case we want broadcast(multicast) data)
+
+    // Set hostname: UKHASnet-ESP-{node_id}-{chip_id}
+    WiFi.hostname(String("UKHASnet-ESP-") + node_id + "-" + String(ESP.getChipId(), HEX));
+    Serial.print("Hostname: ");
+    Serial.println(WiFi.hostname());
+
     Serial.print("Connecting to ");
     Serial.println(ssid);
     WiFi.begin(ssid, password);
-    while (WiFi.status() != WL_CONNECTED) {
+
+    // Wait for IP address
+    for (bool configured = false; !configured; ) {
+        for (auto iface: addrList) {
+            if (configured = !iface.addr().isLocal()) {
+                break;
+            }
+        }
         delay(500);
         Serial.print(".");
     }
     Serial.println();
 
+    // Print IP configuration..
+    for (auto a : addrList) {
+        Serial.print(a.ifnumber());
+        Serial.print(':');
+        Serial.print(a.ifname());
+        Serial.print(": ");
+        Serial.print(a.isV4() ? "IPv4" : "IPv6");
+        Serial.print(a.isLocal() ? " local " : " ");
+        Serial.print(a.toString());
+        if (a.isLegacy()) {
+            Serial.print(" mask:");
+            Serial.print(a.netmask());
+            Serial.print(" gw:");
+            Serial.print(a.gw());
+        }
+        Serial.println();
+    }
+
     // Setup UKHASnet
     resetRadio();
     // Should make it transmit a packet right now, then next after PACKET_INTERVAL
     packet_timer = millis() - PACKET_INTERVAL;
+
+    multicast_ip.fromString(multicast_address);
 }
 
 
@@ -87,8 +147,7 @@ void upload(bool fake) {
     yield();
 
     if (not uploadbuf.size) {
-        uploadbuf.setBuffer(__uploadbuf, uploadbuf_LEN); \
-        ////BUFFER_INIT(uploadbuf, uploadbuf_LEN);
+        uploadbuf.setBuffer(__uploadbuf, uploadbuf_LEN);
     }
     if (not fake) {
         Serial.println("Uploading...");
@@ -134,6 +193,61 @@ void upload(bool fake) {
     }
 
     Serial.println();
+}
+
+void multicast() {
+    yield();
+    Serial.print("Sending multicast packet to ");
+    Serial.print(multicast_ip.toString());
+    Serial.print(" port ");
+    Serial.print(multicast_port, DEC);
+    Serial.println("...");
+
+    if (not uploadbuf.size) {
+        uploadbuf.setBuffer(__uploadbuf, uploadbuf_LEN);
+    }
+
+    // https://oddstr13.openshell.no/paste/VnOnqpUa/
+    uploadbuf.reset();
+
+    uploadbuf.add(0x16); // Dict start
+
+    // -----
+
+    uploadbuf.add((char)(0x80 | 6)); // UTF-8 string, 6 characters
+    uploadbuf.add("packet");
+
+    if (dataptr > 63) {
+        uploadbuf.add(0xC1); // Bytestring, uint16_t n characters
+        uploadbuf.addBytes((uint16_t)dataptr); // n
+    } else {
+        uploadbuf.add((char)0x40 | dataptr); // bytestring, 0-63 characters
+    }
+    uploadbuf.add((char*)databuf, dataptr);
+
+    // -----
+
+    uploadbuf.add((char)(0x80 | 2));
+    uploadbuf.add("gw");
+
+    uploadbuf.add((char)(0x80 | sizeof(node_id)));
+    uploadbuf.add(node_id);
+
+    // -----
+
+    uploadbuf.add((char)(0x80 | 4));
+    uploadbuf.add("rssi");
+
+    uploadbuf.add((char)0x08); // int8_t
+    uploadbuf.add(static_cast<int8_t>(lastrssi));
+
+    // -----
+
+    uploadbuf.add(0x17); // Dict end
+
+    Udp.beginPacketMulticast(multicast_ip, multicast_port, getIP6Address(), multicast_ttl);
+    Udp.write(uploadbuf.buf, uploadbuf.ptr);
+    Udp.endPacket();
 }
 
 /**
@@ -268,6 +382,7 @@ void loop() {
         if (isUkhasnetPacket(databuf, dataptr)) {
             Serial.write(databuf, dataptr);
             Serial.println();
+            multicast();
             upload();
         } else {
             upload(true);
