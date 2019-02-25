@@ -73,6 +73,7 @@ unsigned long packet_timer;
 unsigned long PACKET_INTERVAL = 15*60*1000;
 void setup() {
     Serial.begin(115200);
+    Serial1.begin(115200);
     delay(200);
 
     Serial.println();
@@ -126,6 +127,8 @@ void setup() {
     packet_timer = millis() - PACKET_INTERVAL;
 
     multicast_ip.fromString(multicast_address);
+
+    Serial.println("Setup done.");
 }
 
 
@@ -364,7 +367,7 @@ void loop() {
     }
 
     // TODO: Add timeout parameter to rf69_receive_long, to allow other tasks to run (outside of yield())
-    res = rf69_receive_long(databuf, &dataptr, &lastrssi, &packet_received, databuf_LEN, DIO1_pin);
+    res = rf69_receive_long(databuf, &dataptr, &lastrssi, &packet_received, databuf_LEN, DIO1_pin, 20000);
 
     if (res == RFM_OK) {
         Serial.print("Result: ");
@@ -388,6 +391,34 @@ void loop() {
             upload(true);
         }
 
+    } else {
+        Serial.print(F("RFM RX Error: "));
+    }
+
+    switch (res) {
+        case RFM_OK:
+            Serial1.println(F("RFM_OK"));
+            break;
+        case RFM_FAIL:
+            Serial1.println(F("RFM_FAIL"));
+            Serial.println(F("RFM_FAIL"));
+            break;
+        case RFM_TIMEOUT:
+            Serial1.println(F("RFM_TIMEOUT"));
+            Serial.println(F("RFM_TIMEOUT"));
+            break;
+        case RFM_CRC_ERROR:
+            Serial1.println(F("RFM_CRC_ERROR"));
+            Serial.println(F("RFM_CRC_ERROR"));
+            break;
+        case RFM_BUFFER_OVERFLOW:
+            Serial1.println(F("RFM_BUFFER_OVERFLOW"));
+            Serial.println(F("RFM_BUFFER_OVERFLOW"));
+            break;
+        default:
+            Serial1.print(F("Unknown RFM return code: "));
+            Serial1.println(res);
+            Serial.println(res);
     }
 }
 

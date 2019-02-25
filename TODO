@@ -8,6 +8,7 @@ TODO:
     Implement (M)ode flag, and submit patches upstream:
       Make sure to keep Grafana & InfluxDB in mind.
       ☐ Implement Mode Flag
+      Transmits, Receives, Repeats, Gateways, Fixed/Mobile, Balloon?
       Upstream:
         There could be more places that need patches, but here are the main ones.
         ☐ Protocol definition - https://github.com/UKHASnet/protocol
@@ -19,4 +20,4 @@ TODO:
           ☐ InfluxDB daemon - https://github.com/adamgreig/ukhasnet-influxdb
 
   Radio interface:
-    ☐ Add timeout parameter to rf69_receive_long, to allow other tasks to run (outside of yield())
+    ☐ Add timeout parameter to rf69_receive_long, to allow other tasks to run (outside of yield()) @started
