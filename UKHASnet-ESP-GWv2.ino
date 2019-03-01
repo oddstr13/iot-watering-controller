@@ -153,6 +153,7 @@ void upload(bool fake) {
         uploadbuf.setBuffer(__uploadbuf, uploadbuf_LEN);
     }
     if (not fake) {
+        http.setReuse(true);
         Serial.println("Uploading...");
         http.begin(api_url);
         http.addHeader("Content-Type", "application/x-www-form-urlencoded");
