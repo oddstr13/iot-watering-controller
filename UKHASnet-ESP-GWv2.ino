@@ -67,7 +67,7 @@ IPAddress getIP6Address(int ifn=STATION_IF) {
 }
 
 WiFiUDP Udp;
-IPAddress multicast_ip;
+IPAddress multicast_ip, multicast_ip_other;
 
 unsigned long packet_timer;
 unsigned long PACKET_INTERVAL = 15*60*1000;
@@ -127,6 +127,7 @@ void setup() {
     packet_timer = millis() - PACKET_INTERVAL;
 
     multicast_ip.fromString(multicast_address);
+    multicast_ip_other.fromString(multicast_address_other);
 
     Serial.println("Setup done.");
 }
@@ -199,10 +200,10 @@ void upload(bool fake) {
     Serial.println();
 }
 
-void multicast() {
+void multicast(IPAddress target) {
     yield();
     Serial.print("Sending multicast packet to ");
-    Serial.print(multicast_ip.toString());
+    Serial.print(target.toString());
     Serial.print(" port ");
     Serial.print(multicast_port, DEC);
     Serial.println("...");
@@ -249,7 +250,7 @@ void multicast() {
 
     uploadbuf.add(0x17); // Dict end
 
-    Udp.beginPacketMulticast(multicast_ip, multicast_port, getIP6Address(), multicast_ttl);
+    Udp.beginPacketMulticast(target, multicast_port, getIP6Address(), multicast_ttl);
     Udp.write(uploadbuf.buf, uploadbuf.ptr);
     Udp.endPacket();
 }
@@ -346,6 +347,7 @@ void sendPacket() {
 
     // Upload packet.
     lastrssi = 1;
+    multicast(multicast_ip);
     upload();
     Serial.println("Own packet uploaded, transmitting...");
 
@@ -386,9 +388,10 @@ void loop() {
         if (isUkhasnetPacket(databuf, dataptr)) {
             Serial.write(databuf, dataptr);
             Serial.println();
-            multicast();
+            multicast(multicast_ip);
             upload();
         } else {
+            multicast(multicast_ip_other);
             upload(true);
         }
 
