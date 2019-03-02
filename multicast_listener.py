@@ -1,13 +1,24 @@
 import socket
 import struct
 import subprocess
+import time
 
 import arrow
+try:
+    import win32con
+    import win32gui
+    import win32api
+    _windows_magic_window = None
+except:
+    pass
 
 # https://bugs.python.org/issue29515
 IPPROTO_IPV6 = getattr(socket, 'IPPROTO_IPV6', 41)
 
-MULTICAST_ADDRESS = "ff18::554b:4841:536e:6574:1"
+MULTICAST_ADDRESSES = [
+    "ff18::554b:4841:536e:6574:1",
+    "ff18::554b:4841:536e:6574:2",
+]
 MULTICAST_PORT = 20750
 MULTICAST_INTERFACE = 8
 # http://cubicspot.blogspot.com/2016/04/need-random-tcp-port-number-for-your.html
@@ -25,6 +36,59 @@ def cmd(args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, encoding=None):
     else:
         p.wait()
         return p.returncode
+
+def windowsPowerMagic():
+    # https://stackoverflow.com/questions/1411186/python-windows-shutdown-events
+    global _windows_magic_window
+
+    hinst = win32api.GetModuleHandle(None)
+    wndclass = win32gui.WNDCLASS()
+    wndclass.hInstance = hinst
+    wndclass.lpszClassName = "testWindowClass"
+    messageMap = {
+        win32con.WM_QUERYENDSESSION : windowsPowerMagicCallback,
+        win32con.WM_ENDSESSION : windowsPowerMagicCallback,
+        win32con.WM_QUIT : windowsPowerMagicCallback,
+        win32con.WM_DESTROY : windowsPowerMagicCallback,
+        win32con.WM_CLOSE : windowsPowerMagicCallback,
+        win32con.WM_POWERBROADCAST: windowsPowerMagicCallback,
+    }
+
+    wndclass.lpfnWndProc = messageMap
+
+    try:
+        myWindowClass = win32gui.RegisterClass(wndclass)
+        _windows_magic_window = win32gui.CreateWindowEx(win32con.WS_EX_LEFT,
+                                     myWindowClass, 
+                                     "testMsgWindow", 
+                                     0, 
+                                     0, 
+                                     0, 
+                                     win32con.CW_USEDEFAULT, 
+                                     win32con.CW_USEDEFAULT, 
+                                     0, 
+                                     0, 
+                                     hinst, 
+                                     None)
+        #win32gui.ShowWindow(_windows_magic_window, win32con.SW_SHOWMAXIMIZED) # Oh, look, there's the window! Frozen tho..
+    except Exception as e:
+        print("Exception: %s" % str(e))
+
+
+    #if _windows_magic_window is None:
+    #    print("hwnd is none!")
+    #else:
+    #    print("hwnd: %s" % _windows_magic_window)
+
+def windowsPowerMagicCallback(hwnd, msg, wparam, lparam):
+    print(arrow.now(), "win32 window event {}".format((msg, wparam, lparam)))
+    if msg == win32con.WM_POWERBROADCAST and wparam == win32con.PBT_APMRESUMEAUTOMATIC:
+        print(arrow.now(), "resuming from sleep")
+        multicast_listen()
+
+def windowsPowerMagicTick():
+    win32gui.PumpWaitingMessages()
+
 
 def windowsParseRoute():
     data = cmd(["route", "print"], encoding="UTF8").replace('\r\n', '\n')
@@ -70,6 +134,9 @@ sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 try: sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
 except: pass
 
+try: sock.setsockopt(socket.SOL_IP, socket.IP_PKTINFO)
+except: pass
+
 # Binds to all interfaces on the given port
 sock.bind(('::', MULTICAST_PORT))
 
@@ -77,17 +144,41 @@ sock.bind(('::', MULTICAST_PORT))
 # This
 sock.setsockopt(IPPROTO_IPV6, socket.IPV6_MULTICAST_LOOP, True)
 
-# Construct message for joining multicast group
-for ifnum in getInterfaces():
-    mreq = socket.inet_pton(socket.AF_INET6, MULTICAST_ADDRESS) + struct.pack('@L', ifnum) # Multicast address + interface
-    sock.setsockopt(IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
+def multicast_listen():
+    print("Subscribing to multicast addresses")
+    # Construct message for joining multicast group
+    for ifnum in getInterfaces():
+        for mcast in MULTICAST_ADDRESSES:
+            print(ifnum, mcast)
+            mreq = socket.inet_pton(socket.AF_INET6, mcast) + struct.pack('@L', ifnum) # Multicast address + interface
+            try:
+                sock.setsockopt(IPPROTO_IPV6, socket.IPV6_LEAVE_GROUP, mreq)
+                time.sleep(0.01)
+            except: pass
+            sock.setsockopt(IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
 
+multicast_listen()
 # 5s timeout
-sock.settimeout(5)
+sock.settimeout(0.1)
 
+windowsPowerMagic()
+
+has_recvmsg = bool(hasattr(socket, "recvmsg"))
 while True:
     try:
-        data, addr = sock.recvfrom(1500)
-        print(arrow.now(), data, addr)
-    except socket.timeout:
-        pass
+        windowsPowerMagicTick()
+        try:
+            if has_recvmsg:
+                # Not available on Windows.
+                # Need to set up one socket per multicast address (and interface if desired)
+                # in order to get the target address of the packet.
+                data, anc, flags, addr = socket.recvmsg(1500, 500)
+                print(arrow.now(), data, addr, anc, flags)
+            else:
+                data, addr = sock.recvfrom(1500)
+                print(arrow.now(), data, addr)
+        except socket.timeout:
+            pass
+    except KeyboardInterrupt:
+        print("KeyboardInterrupt, exiting.")
+        break
