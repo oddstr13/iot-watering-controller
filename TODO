@@ -2,7 +2,10 @@ TODO:
   ☐ Configuration interface.
   ☐ Multicast (or broadcast). @started(19-02-06 00:34)
   ☐ IPv6. @started
-  ☐ Add Wifi based location (On boot, or on configuration).
+  ☐ Add Wifi based location (On boot, or on configuration). @started
+  SSL verification missing. No config yet.
+  ☐ Add NTP support.
+  ☐ Add mDNS support.
 
   UKHASnet:
     Implement (M)ode flag, and submit patches upstream:

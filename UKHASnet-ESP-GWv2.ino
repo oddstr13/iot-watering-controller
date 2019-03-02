@@ -66,6 +66,10 @@ IPAddress getIP6Address(int ifn=STATION_IF) {
     return IP6_ADDR_ANY;
 }
 
+void wifiScanCallback(int found);
+double latitude = NAN;
+double longitude = NAN;
+
 WiFiUDP Udp;
 IPAddress multicast_ip, multicast_ip_other;
 
@@ -81,14 +85,19 @@ void setup() {
     WiFi.mode(WIFI_STA); // Disable access point.
     WiFi.softAPdisconnect(true);
     WiFi.setSleepMode(WIFI_NONE_SLEEP); // Disable sleep (In case we want broadcast(multicast) data)
+    int networks_found = WiFi.scanNetworks(false, true);
 
     // Set hostname: UKHASnet-ESP-{node_id}-{chip_id}
     WiFi.hostname(String("UKHASnet-ESP-") + node_id + "-" + String(ESP.getChipId(), HEX));
     Serial.print("Hostname: ");
     Serial.println(WiFi.hostname());
+    Serial1.print("Hostname: ");
+    Serial1.println(WiFi.hostname());
 
     Serial.print("Connecting to ");
     Serial.println(ssid);
+    Serial1.print("Connecting to ");
+    Serial1.println(ssid);
     WiFi.begin(ssid, password);
 
     // Wait for IP address
@@ -100,8 +109,10 @@ void setup() {
         }
         delay(500);
         Serial.print(".");
+        Serial1.print(".");
     }
     Serial.println();
+    Serial1.println();
 
     // Print IP configuration..
     for (auto a : addrList) {
@@ -112,14 +123,31 @@ void setup() {
         Serial.print(a.isV4() ? "IPv4" : "IPv6");
         Serial.print(a.isLocal() ? " local " : " ");
         Serial.print(a.toString());
+
+        Serial1.print(a.ifnumber());
+        Serial1.print(':');
+        Serial1.print(a.ifname());
+        Serial1.print(": ");
+        Serial1.print(a.isV4() ? "IPv4" : "IPv6");
+        Serial1.print(a.isLocal() ? " local " : " ");
+        Serial1.print(a.toString());
         if (a.isLegacy()) {
             Serial.print(" mask:");
             Serial.print(a.netmask());
             Serial.print(" gw:");
             Serial.print(a.gw());
+
+            Serial1.print(" mask:");
+            Serial1.print(a.netmask());
+            Serial1.print(" gw:");
+            Serial1.print(a.gw());
         }
         Serial.println();
+        Serial1.println();
     }
+
+    // Attempt to get geolocation
+    wifiScanCallback(networks_found);
 
     // Setup UKHASnet
     resetRadio();
@@ -130,6 +158,7 @@ void setup() {
     multicast_ip_other.fromString(multicast_address_other);
 
     Serial.println("Setup done.");
+    Serial1.println("Setup done.");
 }
 
 
@@ -325,11 +354,16 @@ void sendPacket() {
         case 0:
             // TODO: implement (M)ode flag, and submit patches upstream.
             sendbuf.add("Z2"); // Non-standard. GW. 
-            break;
+            //break;
         case 1: // 'c'
-            //sendbuf.add('L'); // TODO: Add Wifi based location.
-            break;
+            //break;
         default:
+            if (latitude != NAN and longitude != NAN) {
+                sendbuf.add('L'); // TODO: Add Wifi based location.
+                sendbuf.add(String(latitude, 5));
+                sendbuf.add(',');
+                sendbuf.add(String(longitude, 5));
+            }
             break;
     }
 
@@ -651,4 +685,106 @@ void dump_rfm69_registers() {
     rf69_read(RFM69_REG_71_TEST_AFC, &result);
     Serial.print(F("REG_71_TEST_AFC: 0x"));
     Serial.println(result, HEX);
+}
+
+void wifiScanCallback(int found) {
+    Serial.printf("%d network(s) found\r\n", found);
+    Serial1.printf("%d network(s) found\r\n", found);
+    if (found < 2) { // Mozilla Location Services wants at least 2 access points
+        return;
+    }
+    if (not uploadbuf.size) {
+        uploadbuf.setBuffer(__uploadbuf, uploadbuf_LEN);
+    }
+    uploadbuf.reset();
+    uploadbuf.add(F("{\"considerIp\":false,\"fallbacks\":{\"lacf\":false,\"ipf\":false},\"wifiAccessPoints\":["));
+    for (int i = 0; i < found; i++) {
+        if (i != 0) {
+            uploadbuf.add(",");
+        }
+        uploadbuf.add(F("{\"macAddress\":\""));
+        uploadbuf.add(WiFi.BSSIDstr(i));
+        uploadbuf.add(F("\",\"signalStrength\":"));
+        uploadbuf.add(String(WiFi.RSSI(i)));
+        uploadbuf.add(F(",\"channel\":"));
+        uploadbuf.add(String(WiFi.channel(i)));
+        uploadbuf.add(F("}"));
+        Serial.printf("%d: %s, Ch:%d (%ddBm) %s\r\n", i + 1, WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), WiFi.encryptionType(i) == ENC_TYPE_NONE ? "open" : "");
+        Serial1.printf("%d: %s, Ch:%d (%ddBm) %s\r\n", i + 1, WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), WiFi.encryptionType(i) == ENC_TYPE_NONE ? "open" : "");
+        //WiFi.BSSIDstr(i)
+    }
+    uploadbuf.add("]}");
+    Serial.write(uploadbuf.buf, uploadbuf.ptr);
+    Serial.println();
+    Serial1.write(uploadbuf.buf, uploadbuf.ptr);
+    Serial1.println();
+
+    WiFiClientSecure client; // , String("E5:FC:B7:1A:DD:08:DF:B0:E7:D8:7A:7C:62:92:E1:07:EF:26:96:C7")
+    client.setInsecure(); //! TODO: Verify SSL key.
+
+    HTTPClient geoclient; 
+    int res = geoclient.begin(client, "https://location.services.mozilla.com/v1/geolocate?key=test");
+    Serial.println(res);
+    res = geoclient.POST(uploadbuf.buf, uploadbuf.ptr);
+    Serial.println(res);
+    Serial1.println(res);
+    String response = geoclient.getString();
+    Serial.println(response);
+    Serial1.println(response);
+    geoclient.end();
+
+    double lat = NAN;
+    double lon = NAN;
+    // {"location": {"lat": 48.4167949, "lng": 18.9420294}, "accuracy": 10.0}
+    int pos, pos2, pos3, start, end;
+    if (res == HTTP_CODE_OK) {
+        pos = response.indexOf("location");
+        if (pos >= 0) {
+            start = response.indexOf('{', pos);
+            end = response.indexOf('}', start);
+            if (start > 0 and end > 0) {
+                // Parse lat
+                pos = response.indexOf("lat", start);
+                if (pos > end) {
+                    return;
+                }
+                pos = response.indexOf(':', pos) + 1;
+                pos2 = response.indexOf(',', pos);
+                pos3 = response.indexOf('}', pos);
+                pos2 = min(pos2, pos3);
+                String lat_s = response.substring(pos, pos2);
+                lat_s.trim();
+                Serial1.print("lat_s:");
+                Serial1.println(lat_s);
+                if (lat_s.charAt(0) == '-' or isdigit(lat_s.charAt(0))) {
+                    lat = lat_s.toFloat();
+                }
+
+                // Parse lon
+                pos = response.indexOf("lng", start);
+                if (pos > end) {
+                    return;
+                }
+                pos = response.indexOf(':', pos) + 1;
+                pos2 = response.indexOf(',', pos);
+                pos3 = response.indexOf('}', pos);
+                pos2 = min(pos2, pos3);
+                String lon_s = response.substring(pos, pos2);
+                lon_s.trim();
+                Serial1.print("lon_s:");
+                Serial1.println(lon_s);
+                if (lon_s.charAt(0) == '-' or isdigit(lon_s.charAt(0))) {
+                    lon = lon_s.toFloat();
+                }
+
+
+            }
+        }
+    }
+    if (lat != NAN and lon != NAN) {
+        Serial.println("Updating coordinates");
+        Serial1.println("Updating coordinates");
+        latitude = lat;
+        longitude = lon;
+    }
 }
