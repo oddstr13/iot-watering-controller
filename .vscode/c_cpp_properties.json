@@ -2,7 +2,12 @@
     "configurations": [
         {
             "name": "Win32",
+            "compilerPath": "",
+            "compilerArgs": [],
+            "intelliSenseMode": "msvc-x64",
             "includePath": [
+                "C:\\Users\\Odd\\Documents\\Arduino\\tools\\**",
+                "C:\\Users\\Odd\\Documents\\Arduino\\hardware\\esp8266com\\esp8266\\**",
                 "${workspaceRoot}",
                 "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\tools\\**",
                 "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.5.0\\tools\\sdk\\lwip2\\include",
@@ -11,15 +16,14 @@
                 "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.5.0\\variants\\d1_mini",
                 "C:\\Users\\Odd\\Documents\\Arduino\\libraries\\**"
             ],
-            "browse": {
-                "limitSymbolsToIncludedHeaders": true,
-                "path": [
-                    "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.5.0\\cores\\esp8266",
-                    "C:\\Users\\Odd\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.5.0\\libraries",
-                    "C:\\Users\\Odd\\Documents\\Arduino\\libraries",
-                    "${workspaceRoot}"
-                ]
-            },
+            "forcedInclude": [],
+            "defines": [
+                "LWIP_IPV6=1",
+                "LWIP_FEATURES=1",
+                "MDNS_IP6_SUPPORT",
+                "RFM_DEBUG"
+            ]
+        },
             "intelliSenseMode": "msvc-x64",
             "forcedInclude": [],
             "defines": [
