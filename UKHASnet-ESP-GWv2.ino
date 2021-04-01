@@ -74,7 +74,7 @@ WiFiUDP Udp;
 IPAddress multicast_ip, multicast_ip_other;
 
 unsigned long packet_timer;
-unsigned long PACKET_INTERVAL = 15*60*1000;
+
 void setup() {
     Serial.begin(115200);
     Serial1.begin(115200);
@@ -151,8 +151,8 @@ void setup() {
 
     // Setup UKHASnet
     resetRadio();
-    // Should make it transmit a packet right now, then next after PACKET_INTERVAL
-    packet_timer = millis() - PACKET_INTERVAL;
+    // Should make it transmit a packet right now, then next after packet_interval
+    packet_timer = millis() - packet_interval;
 
     multicast_ip.fromString(multicast_address);
     multicast_ip_other.fromString(multicast_address_other);
@@ -230,6 +230,9 @@ void upload(bool fake) {
 }
 
 void multicast(IPAddress target) {
+    if (!multicast_enabled) {
+        return;
+    }
     yield();
     Serial.print("Sending multicast packet to ");
     Serial.print(target.toString());
@@ -389,7 +392,9 @@ void sendPacket() {
     Serial.println();
 
     // Transmit packet. 10dBm (10mW)
-    rf69_send_long(sendbuf.buf, sendbuf.ptr, 10, DIO1_pin);
+    if (tx_enabled) {
+        rf69_send_long(sendbuf.buf, sendbuf.ptr, 10, DIO1_pin);
+    }
 
     // Increment sequence for next time.
     sequence = (sequence + 1) % 25;
@@ -398,9 +403,9 @@ void sendPacket() {
 
 rfm_status_t res;
 void loop() {
-    if (getTimeSince(packet_timer) >= PACKET_INTERVAL) {
+    if (getTimeSince(packet_timer) >= packet_interval) {
         sendPacket();
-        packet_timer += PACKET_INTERVAL;
+        packet_timer += packet_interval;
     }
 
     // TODO: Add timeout parameter to rf69_receive_long, to allow other tasks to run (outside of yield())
