@@ -1,7 +1,9 @@
+import os
 import socket
 import struct
 import subprocess
 import time
+import platform
 
 import arrow
 try:
@@ -11,6 +13,8 @@ try:
     _windows_magic_window = None
 except:
     pass
+
+is_windows = platform.system == "Windows"
 
 # https://bugs.python.org/issue29515
 IPPROTO_IPV6 = getattr(socket, 'IPPROTO_IPV6', 41)
@@ -121,9 +125,15 @@ def windowsParseRoute():
 
     return res
 
+def linuxGetInterfaces():
+    for ifn in os.listdir("/sys/class/net/"):
+        yield socket.if_nametoindex(ifn)
+
 def getInterfaces():
     # TODO: Make multi-platform
-    return list(windowsParseRoute().get('interfaces').keys())
+    if is_windows:
+        return list(windowsParseRoute().get('interfaces').keys())
+    return list(linuxGetInterfaces())
 
 # Initialise socket for IPv6 datagrams
 sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -161,12 +171,14 @@ multicast_listen()
 # 5s timeout
 sock.settimeout(0.1)
 
-windowsPowerMagic()
+if is_windows:
+    windowsPowerMagic()
 
 has_recvmsg = bool(hasattr(socket, "recvmsg"))
 while True:
     try:
-        windowsPowerMagicTick()
+        if is_windows:
+            windowsPowerMagicTick()
         try:
             if has_recvmsg:
                 # Not available on Windows.

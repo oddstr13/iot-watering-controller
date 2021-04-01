@@ -23,7 +23,8 @@ sock.setsockopt(IPPROTO_IPV6, socket.IPV6_MULTICAST_HOPS, 5)
 
 # Set interface to transmit multicast packet on.
 # Either specify IPV6_MULTICAST_IF, or bind to a address on the interface.
-sock.setsockopt(IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, 8) # interface 8 (Ethernet) # TODO: Find a way to get the ifindex
+#sock.setsockopt(IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, 8) # interface 8 (Ethernet) # TODO: Find a way to get the ifindex
+sock.setsockopt(IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, socket.if_nametoindex("enp4s0"))
 #sock.bind(("2a02::", 0))
 
 sock.sendto(message.encode(), sock_addr)
