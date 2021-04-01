@@ -8,6 +8,8 @@
         "xstring": "cpp",
         "xtree": "cpp",
         "xutility": "cpp",
-        "iosfwd": "cpp"
+        "iosfwd": "cpp",
+        "array": "cpp",
+        "string": "cpp"
     }
 }

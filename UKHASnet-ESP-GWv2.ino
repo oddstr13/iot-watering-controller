@@ -75,12 +75,45 @@ IPAddress multicast_ip, multicast_ip_other;
 
 unsigned long packet_timer;
 
+#define SERIAL_PRINT(data) {\
+    Serial.print(data);\
+    Serial1.print(data);\
+}
+
+#define SERIAL_PRINTLN(data) {\
+    Serial.println(data);\
+    Serial1.println(data);\
+}
+
+#define SERIAL_PRINT_VAR(variable) {\
+    SERIAL_PRINT(#variable ": ");\
+    SERIAL_PRINTLN(variable);\
+}
+
+void printNodeConfig() {
+    SERIAL_PRINT_VAR(ssid);
+    SERIAL_PRINT_VAR(node_id);
+    SERIAL_PRINT_VAR(packet_interval);
+    SERIAL_PRINT_VAR(tx_enabled);
+
+    SERIAL_PRINT_VAR(api_enabled);
+    SERIAL_PRINT_VAR(api_url);
+
+    SERIAL_PRINT_VAR(multicast_enabled);
+    SERIAL_PRINT_VAR(multicast_address);
+    SERIAL_PRINT_VAR(multicast_address_other);
+    SERIAL_PRINT_VAR(multicast_port);
+    SERIAL_PRINT_VAR(multicast_ttl);
+}
+
 void setup() {
     Serial.begin(115200);
     Serial1.begin(115200);
     delay(200);
 
-    Serial.println();
+    SERIAL_PRINTLN();
+    printNodeConfig();
+
     // Set up WiFi
     WiFi.mode(WIFI_STA); // Disable access point.
     WiFi.softAPdisconnect(true);
@@ -89,15 +122,12 @@ void setup() {
 
     // Set hostname: UKHASnet-ESP-{node_id}-{chip_id}
     WiFi.hostname(String("UKHASnet-ESP-") + node_id + "-" + String(ESP.getChipId(), HEX));
-    Serial.print("Hostname: ");
-    Serial.println(WiFi.hostname());
-    Serial1.print("Hostname: ");
-    Serial1.println(WiFi.hostname());
+    SERIAL_PRINT("Hostname: ");
+    SERIAL_PRINTLN(WiFi.hostname());
 
-    Serial.print("Connecting to ");
-    Serial.println(ssid);
-    Serial1.print("Connecting to ");
-    Serial1.println(ssid);
+    SERIAL_PRINT("Connecting to ");
+    SERIAL_PRINTLN(ssid);
+
     WiFi.begin(ssid, password);
 
     // Wait for IP address
@@ -108,42 +138,27 @@ void setup() {
             }
         }
         delay(500);
-        Serial.print(".");
-        Serial1.print(".");
+        SERIAL_PRINT(".");
     }
-    Serial.println();
-    Serial1.println();
+    SERIAL_PRINTLN();
 
     // Print IP configuration..
     for (auto a : addrList) {
-        Serial.print(a.ifnumber());
-        Serial.print(':');
-        Serial.print(a.ifname());
-        Serial.print(": ");
-        Serial.print(a.isV4() ? "IPv4" : "IPv6");
-        Serial.print(a.isLocal() ? " local " : " ");
-        Serial.print(a.toString());
+        SERIAL_PRINT(a.ifnumber());
+        SERIAL_PRINT(':');
+        SERIAL_PRINT(a.ifname());
+        SERIAL_PRINT(": ");
+        SERIAL_PRINT(a.isV4() ? "IPv4" : "IPv6");
+        SERIAL_PRINT(a.isLocal() ? " local " : " ");
+        SERIAL_PRINT(a.toString());
 
-        Serial1.print(a.ifnumber());
-        Serial1.print(':');
-        Serial1.print(a.ifname());
-        Serial1.print(": ");
-        Serial1.print(a.isV4() ? "IPv4" : "IPv6");
-        Serial1.print(a.isLocal() ? " local " : " ");
-        Serial1.print(a.toString());
         if (a.isLegacy()) {
-            Serial.print(" mask:");
-            Serial.print(a.netmask());
-            Serial.print(" gw:");
-            Serial.print(a.gw());
-
-            Serial1.print(" mask:");
-            Serial1.print(a.netmask());
-            Serial1.print(" gw:");
-            Serial1.print(a.gw());
+            SERIAL_PRINT(" mask:");
+            SERIAL_PRINT(a.netmask());
+            SERIAL_PRINT(" gw:");
+            SERIAL_PRINT(a.gw());
         }
-        Serial.println();
-        Serial1.println();
+        SERIAL_PRINTLN();
     }
 
     // Attempt to get geolocation
@@ -157,8 +172,7 @@ void setup() {
     multicast_ip.fromString(multicast_address);
     multicast_ip_other.fromString(multicast_address_other);
 
-    Serial.println("Setup done.");
-    Serial1.println("Setup done.");
+    SERIAL_PRINTLN("Setup done.");
 }
 
 
@@ -178,6 +192,10 @@ HTTPClient http;
 void upload(bool fake=false);
 void upload(bool fake) {
     yield();
+
+    if (not api_enabled) {
+        fake = true;
+    }
 
     if (not uploadbuf.size) {
         uploadbuf.setBuffer(__uploadbuf, uploadbuf_LEN);
@@ -443,20 +461,16 @@ void loop() {
             Serial1.println(F("RFM_OK"));
             break;
         case RFM_FAIL:
-            Serial1.println(F("RFM_FAIL"));
-            Serial.println(F("RFM_FAIL"));
+            SERIAL_PRINTLN(F("RFM_FAIL"));
             break;
         case RFM_TIMEOUT:
-            Serial1.println(F("RFM_TIMEOUT"));
-            Serial.println(F("RFM_TIMEOUT"));
+            SERIAL_PRINTLN(F("RFM_TIMEOUT"));
             break;
         case RFM_CRC_ERROR:
-            Serial1.println(F("RFM_CRC_ERROR"));
-            Serial.println(F("RFM_CRC_ERROR"));
+            SERIAL_PRINTLN(F("RFM_CRC_ERROR"));
             break;
         case RFM_BUFFER_OVERFLOW:
-            Serial1.println(F("RFM_BUFFER_OVERFLOW"));
-            Serial.println(F("RFM_BUFFER_OVERFLOW"));
+            SERIAL_PRINTLN(F("RFM_BUFFER_OVERFLOW"));
             break;
         default:
             Serial1.print(F("Unknown RFM return code: "));
