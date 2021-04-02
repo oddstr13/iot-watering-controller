@@ -285,7 +285,7 @@ void multicast(IPAddress target) {
     uploadbuf.add((char)(0x80 | 2));
     uploadbuf.add("gw");
 
-    uploadbuf.add((char)(0x80 | sizeof(node_id)));
+    uploadbuf.add((char)(0x80 | strlen(node_id)));
     uploadbuf.add(node_id);
 
     // -----
