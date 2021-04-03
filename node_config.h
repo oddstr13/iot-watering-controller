@@ -20,12 +20,13 @@ extern char multicast_address_other[41];
 extern uint16_t multicast_port;
 extern uint8_t multicast_ttl;
 
-int checkConfig();
+bool validateConfig(const JsonObject obj);
+int parseConfig(const JsonObject obj);
 int readConfig();
-bool saveConfig();
 
+bool saveConfig();
 void setConfig(JsonObject obj, bool include_password=true);
 
-void dumpConfig();
+void dumpConfig(Stream &stream, bool include_password=false);
 
 #endif

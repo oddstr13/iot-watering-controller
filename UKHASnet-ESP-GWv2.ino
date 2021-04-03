@@ -118,7 +118,7 @@ void setup() {
         Serial.println(config_status);
         saveConfig();
     }
-    dumpConfig();
+    dumpConfig(Serial);
 
     SERIAL_PRINTLN();
     printNodeConfig();
@@ -480,6 +480,17 @@ void loop() {
             Serial1.println(res);
             Serial.println(res);
     }
+
+    uint32_t free;
+    uint16_t max;
+    uint8_t frag;
+    ESP.getHeapStats(&free, &max, &frag);
+    Serial.print("free: ");
+    Serial.print(free);
+    Serial.print(", max: ");
+    Serial.print(max);
+    Serial.print(", frag: ");
+    Serial.println(frag);
 }
 
 void dump_rfm69_registers() {

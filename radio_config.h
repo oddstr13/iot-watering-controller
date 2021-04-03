@@ -11,7 +11,7 @@
 
 #include <UKHASnetRFM69.h>
 
-static const int DIO1_pin = 5;
+static const int DIO1_pin = 5; // = Pin D1 on WEMOS D1 mini
 
 static const rfm_reg_t CONFIG[][2] =
 {

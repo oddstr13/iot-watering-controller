@@ -39,7 +39,7 @@ uint8_t multicast_ttl = 8;
     }\
 }
 
-bool validateConfig(const JsonObject &obj) {
+bool validateConfig(const JsonObject obj) {
     if (obj.isNull()) {
         return false;
     }
@@ -70,7 +70,7 @@ bool validateConfig(const JsonObject &obj) {
     }\
 }
 
-int parseConfig(const JsonObject &obj) {
+int parseConfig(const JsonObject obj) {
     if (validateConfig(obj)) {
         LOAD_CHAR_IF_PRESENT(ssid);
         LOAD_CHAR_IF_PRESENT(password);
@@ -125,7 +125,7 @@ int readConfig() {
     obj[#KEY] = KEY;\
 }
 
-void setConfig(JsonObject &obj, bool include_password) {
+void setConfig(JsonObject obj, bool include_password) {
     SET_CHAR(ssid);
     if (include_password) {
         SET_CHAR(password);
@@ -154,10 +154,10 @@ bool saveConfig() {
     EEPROM.commit();
 }
 
-void dumpConfig(Stream &stream) {
+void dumpConfig(Stream &stream, bool include_password) {
     StaticJsonDocument<512> doc;
     doc.to<JsonObject>();
-    setConfig(doc.as<JsonObject>(), false);
+    setConfig(doc.as<JsonObject>(), include_password);
 
     serializeJsonPretty(doc, stream);
 }
