@@ -1,5 +1,6 @@
 {
     "files.associations": {
+        "*.tmpl": "jinja",
         "functional": "cpp",
         "initializer_list": "cpp",
         "list": "cpp",
@@ -10,6 +11,9 @@
         "xutility": "cpp",
         "iosfwd": "cpp",
         "array": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "tuple": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp"
     }
 }

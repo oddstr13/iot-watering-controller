@@ -6,6 +6,7 @@ TODO:
   SSL verification missing. No config yet.
   ☐ Add NTP support.
   ☐ Add mDNS support.
+  ☐ Store settings in flash/EEPROM
 
   UKHASnet:
     Implement (M)ode flag, and submit patches upstream:
