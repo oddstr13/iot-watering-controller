@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import urllib.parse
 import struct
@@ -37,7 +38,7 @@ for p in packets:
 
         print(data[:70], '...')
         print("Size:", len(data[1:]))
-        
+
         plain_packet = packet_content_re.match(data)
         if plain_packet:
             print("This is a plain UKHASnet packet.")
@@ -60,10 +61,10 @@ for p in packets:
         print(len(res))
         for m in res:
             print(m.groupdict())
-        
+
         #if crc_ok and not len(res):
         #    print("Something went wrong..")
         #    exit(1)
-        
+
 
     print()

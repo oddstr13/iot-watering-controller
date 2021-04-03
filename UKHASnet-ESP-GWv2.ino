@@ -6,7 +6,7 @@
 
 #include <Ticker.h>
 
-// 
+//
 #include "radio_config.h"
 #include <UKHASnetRFM69.h>
 
@@ -233,7 +233,7 @@ void upload(bool fake) {
         uploadbuf.addNumber(lastrssi, 1, true);
     }
     uploadbuf.add('\0'); //null terminate the string for safe keeping
-    
+
     Serial.write(uploadbuf.buf, uploadbuf.ptr-1);
     Serial.println();
 
@@ -374,7 +374,7 @@ void sendPacket() {
             break;
         case 0:
             // TODO: implement (M)ode flag, and submit patches upstream.
-            sendbuf.add("Z2"); // Non-standard. GW. 
+            sendbuf.add("Z2"); // Non-standard. GW.
             //break;
         case 1: // 'c'
             //break;
@@ -416,7 +416,7 @@ void sendPacket() {
 
     // Increment sequence for next time.
     sequence = (sequence + 1) % 25;
-    //* Sequence goes 'b'-'z', with 'a' transmitted as first packet after boot. 
+    //* Sequence goes 'b'-'z', with 'a' transmitted as first packet after boot.
 }
 
 rfm_status_t res;
@@ -741,7 +741,7 @@ void wifiScanCallback(int found) {
     WiFiClientSecure client; // , String("E5:FC:B7:1A:DD:08:DF:B0:E7:D8:7A:7C:62:92:E1:07:EF:26:96:C7")
     client.setInsecure(); //! TODO: Verify SSL key.
 
-    HTTPClient geoclient; 
+    HTTPClient geoclient;
     int res = geoclient.begin(client, "https://location.services.mozilla.com/v1/geolocate?key=test");
     Serial.println(res);
     res = geoclient.POST(uploadbuf.buf, uploadbuf.ptr);

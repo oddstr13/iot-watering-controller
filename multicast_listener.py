@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import os
 import socket
 import struct
@@ -63,16 +65,16 @@ def windowsPowerMagic():
     try:
         myWindowClass = win32gui.RegisterClass(wndclass)
         _windows_magic_window = win32gui.CreateWindowEx(win32con.WS_EX_LEFT,
-                                     myWindowClass, 
-                                     "testMsgWindow", 
-                                     0, 
-                                     0, 
-                                     0, 
-                                     win32con.CW_USEDEFAULT, 
-                                     win32con.CW_USEDEFAULT, 
-                                     0, 
-                                     0, 
-                                     hinst, 
+                                     myWindowClass,
+                                     "testMsgWindow",
+                                     0,
+                                     0,
+                                     0,
+                                     win32con.CW_USEDEFAULT,
+                                     win32con.CW_USEDEFAULT,
+                                     0,
+                                     0,
+                                     hinst,
                                      None)
         #win32gui.ShowWindow(_windows_magic_window, win32con.SW_SHOWMAXIMIZED) # Oh, look, there's the window! Frozen tho..
     except Exception as e:
@@ -96,7 +98,7 @@ def windowsPowerMagicTick():
 
 def windowsParseRoute():
     data = cmd(["route", "print"], encoding="UTF8").replace('\r\n', '\n')
-    
+
     res = {}
     for block in data.split('\n\n'):
         block = block.strip("=").strip()
