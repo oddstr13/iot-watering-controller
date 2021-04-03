@@ -14,6 +14,7 @@
 #include <iso646.h>
 
 #include "node_config.h"
+#include "global_buffers.h"
 
 volatile bool transmitting_packet = false;
 
@@ -111,6 +112,14 @@ void setup() {
     Serial1.begin(115200);
     delay(1000);
 
+    int config_status = readConfig();
+    if (config_status != 0) {
+        Serial.print("Config reading error: ");
+        Serial.println(config_status);
+        saveConfig();
+    }
+    dumpConfig();
+
     SERIAL_PRINTLN();
     printNodeConfig();
 
@@ -184,9 +193,6 @@ float lastrssi = 0;
 
 WiFiClientSecure client;
 
-#define uploadbuf_LEN 1500
-Buffer uploadbuf;
-uint8_t __uploadbuf[uploadbuf_LEN];
 HTTPClient http;
 
 void upload(bool fake=false);
@@ -197,9 +203,8 @@ void upload(bool fake) {
         fake = true;
     }
 
-    if (not uploadbuf.size) {
-        uploadbuf.setBuffer(__uploadbuf, uploadbuf_LEN);
-    }
+    init_global_buffers();
+
     if (not fake) {
         http.setReuse(true);
         Serial.println("Uploading...");
@@ -258,9 +263,7 @@ void multicast(IPAddress target) {
     Serial.print(multicast_port, DEC);
     Serial.println("...");
 
-    if (not uploadbuf.size) {
-        uploadbuf.setBuffer(__uploadbuf, uploadbuf_LEN);
-    }
+    init_global_buffers();
 
     // https://oddstr13.openshell.no/paste/VnOnqpUa/
     uploadbuf.reset();
@@ -712,9 +715,9 @@ void wifiScanCallback(int found) {
     if (found < 2) { // Mozilla Location Services wants at least 2 access points
         return;
     }
-    if (not uploadbuf.size) {
-        uploadbuf.setBuffer(__uploadbuf, uploadbuf_LEN);
-    }
+
+    init_global_buffers();
+
     uploadbuf.reset();
     uploadbuf.add(F("{\"considerIp\":false,\"fallbacks\":{\"lacf\":false,\"ipf\":false},\"wifiAccessPoints\":["));
     for (int i = 0; i < found; i++) {

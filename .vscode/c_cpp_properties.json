@@ -25,6 +25,8 @@
                 "/home/oddstr13/Projects/Arduino/hardware/esp8266com/esp8266/libraries/Ticker",
                 "/home/oddstr13/Projects/Arduino/libraries/UKHASnetRFM69",
                 "/home/oddstr13/Projects/Arduino/libraries/Buffer",
+                "/home/oddstr13/Projects/Arduino/libraries/ArduinoJson/src",
+                "/home/oddstr13/Projects/Arduino/hardware/esp8266com/esp8266/libraries/EEPROM",
                 "/home/oddstr13/Projects/Arduino/libraries/wifi_credentials",
                 "/home/oddstr13/Projects/Arduino/hardware/esp8266com/esp8266/libraries/SPI",
                 "/mnt/software/Projects/Arduino/hardware/esp8266com/esp8266/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2",
