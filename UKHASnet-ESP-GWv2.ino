@@ -16,6 +16,8 @@
 #include "node_config.h"
 #include "global_buffers.h"
 
+#include "http_server.h"
+
 volatile bool transmitting_packet = false;
 
 int rfmCSPin = 0;
@@ -172,6 +174,8 @@ void setup() {
 
     // Attempt to get geolocation
     wifiScanCallback(networks_found);
+
+    http_server_setup();
 
     // Setup UKHASnet
     resetRadio();
@@ -407,7 +411,7 @@ void sendPacket() {
     lastrssi = 1;
     multicast(multicast_ip);
     upload();
-    Serial.println("Own packet uploaded, transmitting...");
+    Serial.println(F("Own packet uploaded, transmitting..."));
 
     Serial.write(sendbuf.buf, sendbuf.ptr);
     Serial.println();
@@ -429,8 +433,10 @@ void loop() {
         packet_timer += packet_interval;
     }
 
+    http_server_update();
+
     // TODO: Add timeout parameter to rf69_receive_long, to allow other tasks to run (outside of yield())
-    res = rf69_receive_long(databuf, &dataptr, &lastrssi, &packet_received, databuf_LEN, DIO1_pin, 20000);
+    res = rf69_receive_long(databuf, &dataptr, &lastrssi, &packet_received, databuf_LEN, DIO1_pin, 200);
 
     if (res == RFM_OK) {
         Serial.print("Result: ");
@@ -455,6 +461,7 @@ void loop() {
             upload(true);
         }
 
+    } else if (res == RFM_TIMEOUT) {
     } else {
         Serial.print(F("RFM RX Error: "));
     }
@@ -467,7 +474,7 @@ void loop() {
             SERIAL_PRINTLN(F("RFM_FAIL"));
             break;
         case RFM_TIMEOUT:
-            SERIAL_PRINTLN(F("RFM_TIMEOUT"));
+            Serial1.println(F("RFM_TIMEOUT"));
             break;
         case RFM_CRC_ERROR:
             SERIAL_PRINTLN(F("RFM_CRC_ERROR"));
@@ -485,12 +492,14 @@ void loop() {
     uint16_t max;
     uint8_t frag;
     ESP.getHeapStats(&free, &max, &frag);
-    Serial.print("free: ");
+    Serial.print(F("free: "));
     Serial.print(free);
-    Serial.print(", max: ");
+    Serial.print(F(", max: "));
     Serial.print(max);
-    Serial.print(", frag: ");
-    Serial.println(frag);
+    Serial.print(F(", frag: "));
+    Serial.print(frag);
+    Serial.print(F(", stack: "));
+    Serial.println(ESP.getFreeContStack());
 }
 
 void dump_rfm69_registers() {

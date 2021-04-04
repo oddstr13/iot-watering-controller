@@ -6,6 +6,8 @@
  * @{
  */
 
+#define RFM_DEBUG Serial
+
 #ifndef __RFM69CONFIG_H__
 #define __RFM69CONFIG_H__
 

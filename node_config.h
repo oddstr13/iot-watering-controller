@@ -27,6 +27,8 @@ int readConfig();
 bool saveConfig();
 void setConfig(JsonObject obj, bool include_password=true);
 
-void dumpConfig(Stream &stream, bool include_password=false);
+DynamicJsonDocument getConfigDoc(bool include_password);
+
+size_t dumpConfig(Stream &stream, bool include_password=false);
 
 #endif

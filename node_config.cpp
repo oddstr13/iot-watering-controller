@@ -21,31 +21,64 @@ char multicast_address_other[41] = "ff18::554b:4841:536e:6574:2";
 uint16_t multicast_port = 20750;
 uint8_t multicast_ttl = 8;
 
+#define JTYPE2STR(T) if (obj.is<T>()) {return #T;}
+
+char* jsonObjectType(const JsonVariant obj) {
+    JTYPE2STR(char*);
+    JTYPE2STR(String);
+    JTYPE2STR(byte);
+    JTYPE2STR(char);
+    JTYPE2STR(unsigned short);
+    JTYPE2STR(short);
+    JTYPE2STR(unsigned int);
+    JTYPE2STR(int);
+    JTYPE2STR(unsigned long);
+    JTYPE2STR(long);
+    JTYPE2STR(float);
+    JTYPE2STR(double);
+    JTYPE2STR(bool);
+    JTYPE2STR(const char*);
+    JTYPE2STR(JsonArray);
+    JTYPE2STR(JsonObject);
+    return "I have no idea of what this is.";
+}
+
 #define VALIDATE_CHAR_LEN(KEY, LEN) {\
+    Serial.println("Validating " #KEY);\
     if (obj.containsKey(#KEY)) {\
         if (obj[#KEY].is<char*>()) {\
             if (strlen(obj[#KEY].as<char*>()) > LEN) {\
+                Serial.println("validation:ERR: " #KEY " too long.");\
                 return false;\
             }\
         } else {\
+            Serial.print("validation:ERR: " #KEY " type missmatch: ");\
+            Serial.println(jsonObjectType(obj[#KEY]));\
             return false;\
         }\
     }\
 }
 
 #define VALIDATE_TYPE(KEY, T) {\
+    Serial.println("Validating " #KEY);\
     if (obj.containsKey(#KEY) && !obj[#KEY].is<T>()) {\
+        Serial.print("validation:ERR: " #KEY " type missmatch: ");\
+        Serial.println(jsonObjectType(obj[#KEY]));\
         return false;\
     }\
 }
 
 bool validateConfig(const JsonObject obj) {
+    Serial.println("validateConfig");
+
     if (obj.isNull()) {
+        Serial.println("validation:ERR: obj is null.");
         return false;
     }
 
     VALIDATE_CHAR_LEN(ssid, 31);
     VALIDATE_CHAR_LEN(password, 64);
+    VALIDATE_TYPE(clear_password, bool);
     VALIDATE_CHAR_LEN(node_id, 16);
     VALIDATE_CHAR_LEN(api_url, 255);
     VALIDATE_CHAR_LEN(multicast_address, 40);
@@ -56,6 +89,8 @@ bool validateConfig(const JsonObject obj) {
     VALIDATE_TYPE(multicast_enabled, bool);
     VALIDATE_TYPE(multicast_port, uint16_t);
     VALIDATE_TYPE(multicast_ttl, uint8_t);
+
+    return true;
 }
 
 #define LOAD_CHAR_IF_PRESENT(KEY) {\
@@ -73,7 +108,11 @@ bool validateConfig(const JsonObject obj) {
 int parseConfig(const JsonObject obj) {
     if (validateConfig(obj)) {
         LOAD_CHAR_IF_PRESENT(ssid);
-        LOAD_CHAR_IF_PRESENT(password);
+        if (obj.containsKey("clear_password") && !obj["clear_password"]) {
+            password[0] = 0; // Clear password
+        } else {
+            LOAD_CHAR_IF_PRESENT(password);
+        }
         LOAD_CHAR_IF_PRESENT(node_id);
         LOAD_CHAR_IF_PRESENT(api_url);
         LOAD_CHAR_IF_PRESENT(multicast_address);
@@ -89,6 +128,7 @@ int parseConfig(const JsonObject obj) {
 
         return 0;
     } else {
+        Serial.println("parseConfig failed to validate");
         return -1;
     }
 }
@@ -129,6 +169,10 @@ void setConfig(JsonObject obj, bool include_password) {
     SET_CHAR(ssid);
     if (include_password) {
         SET_CHAR(password);
+    } else {
+        if (strlen(password) > 0) {
+            obj["password_set"] = true;
+        }
     }
     SET_CHAR(node_id);
     SET_CHAR(api_url);
@@ -145,6 +189,7 @@ void setConfig(JsonObject obj, bool include_password) {
 }
 
 bool saveConfig() {
+    Serial.print(F("Writing config to EEPROM..."));
     EEPROM.begin(SPI_FLASH_SEC_SIZE);
 
     StaticJsonDocument<512> doc;
@@ -152,12 +197,17 @@ bool saveConfig() {
 
     serializeJson(doc, EEPROM.getDataPtr(), SPI_FLASH_SEC_SIZE);
     EEPROM.commit();
+    Serial.println(F(" OK"));
 }
 
-void dumpConfig(Stream &stream, bool include_password) {
-    StaticJsonDocument<512> doc;
+DynamicJsonDocument getConfigDoc(bool include_password) {
+    DynamicJsonDocument doc = DynamicJsonDocument(512);
     doc.to<JsonObject>();
     setConfig(doc.as<JsonObject>(), include_password);
+    return doc;
+}
 
-    serializeJsonPretty(doc, stream);
+size_t dumpConfig(Stream &stream, bool include_password) {
+    auto doc = getConfigDoc(include_password);
+    return serializeJsonPretty(doc, stream);
 }
