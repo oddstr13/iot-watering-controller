@@ -73,7 +73,7 @@ void handleConfig_GET() {
 
     server.setContentLength(measureJson(doc));
 
-    server.send(200, F("application/json"), String());
+    server.send(200, F("application/json"), emptyString);
 
     auto client = server.client();
     WriteBufferingStream bufferedStream(client, 64);
@@ -87,6 +87,23 @@ bool handleConfig_PATCH() {
 
     DeserializationError err = deserializeJson(doc, server.arg("plain"));
 
+    int code = 200;
+
+    switch (err.code()) {
+        case err.Ok:
+            break;
+        case err.EmptyInput:
+        case err.IncompleteInput:
+        case err.InvalidInput:
+        case err.TooDeep:
+        case err.NotSupported:
+            code = 400;
+            break;
+        case err.NoMemory:
+        default:
+            code = 500;
+    }
+
     if (err) {
         doc.clear();
         doc["error"] = err.c_str();
@@ -98,10 +115,11 @@ bool handleConfig_PATCH() {
             doc["ok"] = "Config set";
         } else {
             doc["error"] = "Validation error";
+            code = 422;
         }
     }
     server.setContentLength(measureJson(doc));
-    server.send(200, F("application/json"), String());
+    server.send(code, F("application/json"), emptyString);
     WriteBufferingStream bufferedStream(client, 64);
     serializeJson(doc, bufferedStream);
     bufferedStream.flush();
@@ -109,6 +127,13 @@ bool handleConfig_PATCH() {
 
 void http_server_setup() {
     filesystem->begin();
+
+
+    server.on("/favicon.ico", HTTP_GET, []() {
+        if (!handleFileRead(server.uri())) {
+            server.send(204);
+        }
+    });
 
     server.on("/", HTTP_GET, []() {
         server.send(200, F("text/html"), FPSTR(INDEX_PAGE));

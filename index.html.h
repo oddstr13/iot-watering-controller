@@ -4,6 +4,7 @@ STRINGIFY(
 
 <head>
 	<meta charset="utf-8" />
+	<link rel="icon" href="data:," />
 	<title>Node configuration</title>
 	<style>
 		label {
