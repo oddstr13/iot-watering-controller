@@ -1,12 +1,14 @@
 TODO:
-  ☐ Configuration interface.
-  ☐ Multicast (or broadcast). @started(19-02-06 00:34)
-  ☐ IPv6. @started
-  ☐ Add Wifi based location (On boot, or on configuration). @started
+  ☐ Configuration interface. @started
+    ☐ Secure configuration interface
+    ✔ Configure via http @done(2021-11-14 18:29)
+  ✔ Multicast (or broadcast). @started(19-02-06 00:34) @done
+  ✔ IPv6. @started @done
+  ✔ Add Wifi based location (On boot, or on configuration). @started @done
   SSL verification missing. No config yet.
   ☐ Add NTP support.
   ☐ Add mDNS support.
-  ☐ Store settings in flash/EEPROM
+  ✔ Store settings in flash/EEPROM @done(2021-04-03 14:14)
 
   UKHASnet:
     Implement (M)ode flag, and submit patches upstream:
@@ -24,4 +26,4 @@ TODO:
           ☐ InfluxDB daemon - https://github.com/adamgreig/ukhasnet-influxdb
 
   Radio interface:
-    ☐ Add timeout parameter to rf69_receive_long, to allow other tasks to run (outside of yield()) @started
+    ✔ Add timeout parameter to rf69_receive_long, to allow other tasks to run (outside of yield()) @started @done

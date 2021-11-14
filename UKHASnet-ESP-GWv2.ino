@@ -14,6 +14,9 @@
 #include <iso646.h>
 
 #include "node_config.h"
+#include "global_buffers.h"
+
+#include "http_server.h"
 
 volatile bool transmitting_packet = false;
 
@@ -40,9 +43,12 @@ rfm_status_t resetRadio() {
     rfm_status = rf69_init(rfmCSPin);
     Serial.print("RFM69 status: ");
     Serial.println(rfm_status);
-    delay(200);
-    ////rf69_burst_write(RFM69_REG_07_FRF_MSB, (rfm_reg_t*)"\xD9\x60\x12", 3);
-    dump_rfm69_registers();
+
+    if (rfm_status == RFM_OK) {
+        delay(200);
+        ////rf69_burst_write(RFM69_REG_07_FRF_MSB, (rfm_reg_t*)"\xD9\x60\x12", 3);
+        dump_rfm69_registers();
+    }
 
     return rfm_status;
 }
@@ -111,6 +117,14 @@ void setup() {
     Serial1.begin(115200);
     delay(1000);
 
+    int config_status = readConfig();
+    if (config_status != 0) {
+        Serial.print("Config reading error: ");
+        Serial.println(config_status);
+        saveConfig();
+    }
+    dumpConfig(Serial);
+
     SERIAL_PRINTLN();
     printNodeConfig();
 
@@ -164,8 +178,10 @@ void setup() {
     // Attempt to get geolocation
     wifiScanCallback(networks_found);
 
+    http_server_setup();
+
     // Setup UKHASnet
-    resetRadio();
+    rfm_status = resetRadio();
     // Should make it transmit a packet right now, then next after packet_interval
     packet_timer = millis() - packet_interval;
 
@@ -184,9 +200,6 @@ float lastrssi = 0;
 
 WiFiClientSecure client;
 
-#define uploadbuf_LEN 1500
-Buffer uploadbuf;
-uint8_t __uploadbuf[uploadbuf_LEN];
 HTTPClient http;
 
 void upload(bool fake=false);
@@ -197,9 +210,8 @@ void upload(bool fake) {
         fake = true;
     }
 
-    if (not uploadbuf.size) {
-        uploadbuf.setBuffer(__uploadbuf, uploadbuf_LEN);
-    }
+    init_global_buffers();
+
     if (not fake) {
         http.setReuse(true);
         Serial.println("Uploading...");
@@ -258,9 +270,7 @@ void multicast(IPAddress target) {
     Serial.print(multicast_port, DEC);
     Serial.println("...");
 
-    if (not uploadbuf.size) {
-        uploadbuf.setBuffer(__uploadbuf, uploadbuf_LEN);
-    }
+    init_global_buffers();
 
     // https://oddstr13.openshell.no/paste/VnOnqpUa/
     uploadbuf.reset();
@@ -354,6 +364,17 @@ bool isUkhasnetPacket(uint8_t *buf, uint16_t len) {
     return true;
 }
 
+bool _ratelimit_firstrun = true;
+unsigned long _last_reset_radio = 0;
+rfm_status_t resetRadioRatelimited() {
+    if (_ratelimit_firstrun || rfm_status == RFM_OK || getTimeSince(_last_reset_radio) >= 15000) {
+        resetRadio();
+        _last_reset_radio = millis();
+        _ratelimit_firstrun = false;
+    }
+    return rfm_status;
+}
+
 int sequence = -1;
 Buffer sendbuf;
 uint8_t __sendbuf[databuf_LEN];
@@ -404,14 +425,18 @@ void sendPacket() {
     lastrssi = 1;
     multicast(multicast_ip);
     upload();
-    Serial.println("Own packet uploaded, transmitting...");
+    Serial.println(F("Own packet uploaded, transmitting..."));
 
     Serial.write(sendbuf.buf, sendbuf.ptr);
     Serial.println();
 
     // Transmit packet. 10dBm (10mW)
     if (tx_enabled) {
-        rf69_send_long(sendbuf.buf, sendbuf.ptr, 10, DIO1_pin);
+        if (rfm_status == RFM_OK || resetRadio() == RFM_OK) {
+            rf69_send_long(sendbuf.buf, sendbuf.ptr, 10, DIO1_pin);
+        } else {
+            SERIAL_PRINTLN("rfm_status is not RFM_OK, even after radio reset, skipping TX.");
+        }
     }
 
     // Increment sequence for next time.
@@ -426,57 +451,78 @@ void loop() {
         packet_timer += packet_interval;
     }
 
-    // TODO: Add timeout parameter to rf69_receive_long, to allow other tasks to run (outside of yield())
-    res = rf69_receive_long(databuf, &dataptr, &lastrssi, &packet_received, databuf_LEN, DIO1_pin, 20000);
+    http_server_update();
 
-    if (res == RFM_OK) {
-        Serial.print("Result: ");
-        Serial.println(res, DEC);
+    if (rfm_status == RFM_OK || resetRadioRatelimited() == RFM_OK) {
+        // TODO: Add timeout parameter to rf69_receive_long, to allow other tasks to run (outside of yield())
+        res = rf69_receive_long(databuf, &dataptr, &lastrssi, &packet_received, databuf_LEN, DIO1_pin, 100);
 
-        Serial.print("RSSI: ");
-        Serial.println(lastrssi);
+        if (res == RFM_OK) {
+            Serial.print("Result: ");
+            Serial.println(res, DEC);
 
-        Serial.print("Bytes: ");
-        Serial.println(dataptr, DEC);
+            Serial.print("RSSI: ");
+            Serial.println(lastrssi);
 
-        Serial.print("Waiting: ");
-        Serial.println(packet_received ? "true" : "false");
+            Serial.print("Bytes: ");
+            Serial.println(dataptr, DEC);
 
-        if (isUkhasnetPacket(databuf, dataptr)) {
-            Serial.write(databuf, dataptr);
-            Serial.println();
-            multicast(multicast_ip);
-            upload();
+            Serial.print("Waiting: ");
+            Serial.println(packet_received ? "true" : "false");
+
+            if (isUkhasnetPacket(databuf, dataptr)) {
+                Serial.write(databuf, dataptr);
+                Serial.println();
+                multicast(multicast_ip);
+                upload();
+            } else {
+                multicast(multicast_ip_other);
+                upload(true);
+            }
+
+        } else if (res == RFM_TIMEOUT) {
         } else {
-            multicast(multicast_ip_other);
-            upload(true);
+            Serial.print(F("RFM RX Error: "));
         }
 
+        switch (res) {
+            case RFM_OK:
+                Serial1.println(F("RFM_OK"));
+                break;
+            case RFM_FAIL:
+                SERIAL_PRINTLN(F("RFM_FAIL"));
+                break;
+            case RFM_TIMEOUT:
+                Serial1.println(F("RFM_TIMEOUT"));
+                break;
+            case RFM_CRC_ERROR:
+                SERIAL_PRINTLN(F("RFM_CRC_ERROR"));
+                break;
+            case RFM_BUFFER_OVERFLOW:
+                SERIAL_PRINTLN(F("RFM_BUFFER_OVERFLOW"));
+                break;
+            default:
+                Serial1.print(F("Unknown RFM return code: "));
+                Serial1.println(res);
+                Serial.println(res);
+        }
     } else {
-        Serial.print(F("RFM RX Error: "));
+        Serial1.println("rfm_status is not RFM_OK, even after radio reset, skipping RX.");
     }
-
-    switch (res) {
-        case RFM_OK:
-            Serial1.println(F("RFM_OK"));
-            break;
-        case RFM_FAIL:
-            SERIAL_PRINTLN(F("RFM_FAIL"));
-            break;
-        case RFM_TIMEOUT:
-            SERIAL_PRINTLN(F("RFM_TIMEOUT"));
-            break;
-        case RFM_CRC_ERROR:
-            SERIAL_PRINTLN(F("RFM_CRC_ERROR"));
-            break;
-        case RFM_BUFFER_OVERFLOW:
-            SERIAL_PRINTLN(F("RFM_BUFFER_OVERFLOW"));
-            break;
-        default:
-            Serial1.print(F("Unknown RFM return code: "));
-            Serial1.println(res);
-            Serial.println(res);
-    }
+/*
+    uint32_t free;
+    uint16_t max;
+    uint8_t frag;
+    ESP.getHeapStats(&free, &max, &frag);
+    Serial.print(F("free: "));
+    Serial.print(free);
+    Serial.print(F(", max: "));
+    Serial.print(max);
+    Serial.print(F(", frag: "));
+    Serial.print(frag);
+    Serial.print(F(", stack: "));
+    Serial.println(ESP.getFreeContStack());
+    */
 }
 
 void dump_rfm69_registers() {
@@ -712,9 +758,9 @@ void wifiScanCallback(int found) {
     if (found < 2) { // Mozilla Location Services wants at least 2 access points
         return;
     }
-    if (not uploadbuf.size) {
-        uploadbuf.setBuffer(__uploadbuf, uploadbuf_LEN);
-    }
+
+    init_global_buffers();
+
     uploadbuf.reset();
     uploadbuf.add(F("{\"considerIp\":false,\"fallbacks\":{\"lacf\":false,\"ipf\":false},\"wifiAccessPoints\":["));
     for (int i = 0; i < found; i++) {
