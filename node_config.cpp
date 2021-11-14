@@ -90,6 +90,8 @@ bool validateConfig(const JsonObject obj) {
     VALIDATE_TYPE(multicast_port, uint16_t);
     VALIDATE_TYPE(multicast_ttl, uint8_t);
 
+    VALIDATE_TYPE(write_flash, bool);
+
     return true;
 }
 
@@ -108,7 +110,7 @@ bool validateConfig(const JsonObject obj) {
 int parseConfig(const JsonObject obj) {
     if (validateConfig(obj)) {
         LOAD_CHAR_IF_PRESENT(ssid);
-        if (obj.containsKey("clear_password") && !obj["clear_password"]) {
+        if (obj.containsKey("clear_password") && obj["clear_password"]) {
             password[0] = 0; // Clear password
         } else {
             LOAD_CHAR_IF_PRESENT(password);
@@ -125,6 +127,10 @@ int parseConfig(const JsonObject obj) {
         LOAD_IF_PRESENT(multicast_port, uint16_t);
         LOAD_IF_PRESENT(multicast_ttl, uint8_t);
         LOAD_IF_PRESENT(packet_interval, unsigned long);
+
+        if (obj.containsKey("write_flash") && obj["write_flash"]) {
+            saveConfig();
+        }
 
         return 0;
     } else {

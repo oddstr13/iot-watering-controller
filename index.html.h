@@ -74,7 +74,9 @@ STRINGIFY(
 			<label for="multicast_ttl">TTL</label>
 			<input name="multicast_ttl" type="number" min="1" max="255" />
 		</fieldset>
-
+		<label for="write_flash" title="Flash has a finite number of writes, avoid writing often.">Write config to flash?
+			<input name="write_flash" type="checkbox" placeholder="false" value="false">
+		</label>
 		<button type="submit">Set</button>
 	</form>
 	<script>
@@ -124,6 +126,7 @@ STRINGIFY(
 		function _loadConfigReal(conf) {
 			config_data = conf;
 			config_data.clear_password = false;
+			config_data.write_flash = false;
 			config_data.packet_interval /= 1000;
 			console.log(config_data);
 
