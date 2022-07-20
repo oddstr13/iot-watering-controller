@@ -31,12 +31,12 @@
                 "/home/oddstr13/Projects/Arduino/libraries/StreamUtils/src",
                 "/home/oddstr13/Projects/Arduino/libraries/wifi_credentials",
                 "/home/oddstr13/Projects/Arduino/hardware/esp8266com/esp8266/libraries/SPI",
-                "/mnt/software/Projects/Arduino/hardware/esp8266com/esp8266/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2",
-                "/mnt/software/Projects/Arduino/hardware/esp8266com/esp8266/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2/xtensa-lx106-elf",
-                "/mnt/software/Projects/Arduino/hardware/esp8266com/esp8266/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2/backward",
-                "/mnt/software/Projects/Arduino/hardware/esp8266com/esp8266/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include",
-                "/mnt/software/Projects/Arduino/hardware/esp8266com/esp8266/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include-fixed",
-                "/mnt/software/Projects/Arduino/hardware/esp8266com/esp8266/tools/xtensa-lx106-elf/xtensa-lx106-elf/include"
+                "/home/oddstr13/Projects/Arduino/hardware/esp8266com/esp8266/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2",
+                "/home/oddstr13/Projects/Arduino/hardware/esp8266com/esp8266/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2/xtensa-lx106-elf",
+                "/home/oddstr13/Projects/Arduino/hardware/esp8266com/esp8266/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2/backward",
+                "/home/oddstr13/Projects/Arduino/hardware/esp8266com/esp8266/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include",
+                "/home/oddstr13/Projects/Arduino/hardware/esp8266com/esp8266/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include-fixed",
+                "/home/oddstr13/Projects/Arduino/hardware/esp8266com/esp8266/tools/xtensa-lx106-elf/xtensa-lx106-elf/include"
             ],
             "forcedInclude": [
                 "/home/oddstr13/Projects/Arduino/hardware/esp8266com/esp8266/cores/esp8266/Arduino.h"
@@ -274,7 +274,8 @@
                 "__GCC_ATOMIC_SHORT_LOCK_FREE=1",
                 "__UINT_FAST8_TYPE__=unsigned int",
                 "__ATOMIC_ACQ_REL=4",
-                "__ATOMIC_RELEASE=3"
+                "__ATOMIC_RELEASE=3",
+                "USBCON"
             ]
         }
     ]
