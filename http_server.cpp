@@ -2,11 +2,14 @@
 
 #include "node_config.h"
 
-#include <ESP8266WebServer.h>
+#define _WIFI_LOGLEVEL_ 4
+#define USE_WIFI_NINA false
+#include <WiFiWebServer.h>
+
 #include <FS.h>
 #include <StreamUtils.h>
 
-ESP8266WebServer server(80);
+WiFiServer server(80);
 FS* filesystem = &SPIFFS;
 
 // Black magic!

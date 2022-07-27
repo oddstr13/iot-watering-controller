@@ -1,10 +1,18 @@
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
+#define _WIFI_LOGLEVEL_ 4
+#include <WiFiHttpClient.h>
+
+#include <WiFi.h>
+#include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 #include <WiFiUdp.h>
 #include <AddrList.h>
 
-#include <Ticker.h>
+
+//#include <Ticker.h>
+
+#ifndef HTTP_CODE_OK
+#define HTTP_CODE_OK 200
+#endif
 
 //
 #include "radio_config.h"
