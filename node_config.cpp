@@ -1,6 +1,13 @@
 #include <wifi_credentials.h>
 #include <EEPROM.h>
 
+#include <ArduinoJson.hpp>
+using namespace ArduinoJson;
+
+#ifndef SPI_FLASH_SEC_SIZE
+    #define SPI_FLASH_SEC_SIZE 4096
+#endif
+
 #include "node_config.h"
 #include "global_buffers.h"
 
@@ -204,6 +211,7 @@ bool saveConfig() {
     serializeJson(doc, EEPROM.getDataPtr(), SPI_FLASH_SEC_SIZE);
     EEPROM.commit();
     Serial.println(F(" OK"));
+    return true;
 }
 
 DynamicJsonDocument getConfigDoc(bool include_password) {

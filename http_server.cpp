@@ -6,17 +6,27 @@
 #define USE_WIFI_NINA false
 #include <WiFiWebServer.h>
 
-#include <FS.h>
+#include <ArduinoJson.h>
 #include <StreamUtils.h>
 
-WiFiServer server(80);
-FS* filesystem = &SPIFFS;
+WiFiWebServer server(80);
+
+#include <FS.h>
+#if ESP8266
+    FS* filesystem = &SPIFFS;
+    #define fs(M) filesystem->M
+#else
+    #include <LittleFS.h>
+    #define fs(M) LittleFS.M
+#endif
 
 // Black magic!
 #define STRINGIFY(X) #X
 static const char INDEX_PAGE[] PROGMEM = ""
 #include "index.html.h"
 ;
+
+String emptyString = String();
 
 String getContentType(String filename) {
     String ext = filename.substring(filename.lastIndexOf('.'));
@@ -57,14 +67,14 @@ bool handleFileRead(String path) {
         path += "index.h";
     }
 
-    if (filesystem->exists(path + ".gz")) {
+    if (fs(exists)(path + ".gz")) {
         path += ".gz";
-    } else if (!filesystem->exists(path)) {
+    } else if (!fs(exists)(path)) {
         return false;
     }
 
     String contentType = getContentType(path);
-    File file = filesystem->open(path, "r");
+    File file = fs(open)(path, "r");
     server.streamFile(file, contentType);
     file.close();
 
@@ -84,7 +94,7 @@ void handleConfig_GET() {
     bufferedStream.flush();
 }
 
-bool handleConfig_PATCH() {
+void handleConfig_PATCH() {
     DynamicJsonDocument doc(512);
     auto client = server.client();
 
@@ -99,7 +109,6 @@ bool handleConfig_PATCH() {
         case err.IncompleteInput:
         case err.InvalidInput:
         case err.TooDeep:
-        case err.NotSupported:
             code = 400;
             break;
         case err.NoMemory:
@@ -129,7 +138,7 @@ bool handleConfig_PATCH() {
 }
 
 void http_server_setup() {
-    filesystem->begin();
+    fs(begin)();
 
 
     server.on("/favicon.ico", HTTP_GET, []() {
@@ -138,8 +147,9 @@ void http_server_setup() {
         }
     });
 
+    F("asdf");
     server.on("/", HTTP_GET, []() {
-        server.send(200, F("text/html"), FPSTR(INDEX_PAGE));
+        server.send(200, F("text/html"), PSTR(INDEX_PAGE));
     });
 
     server.on("/config.json", HTTP_GET, handleConfig_GET);

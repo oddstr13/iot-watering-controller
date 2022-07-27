@@ -1,9 +1,7 @@
 #define _WIFI_LOGLEVEL_ 4
-#include <WiFiHttpClient.h>
+#include <HTTPClient.h>
 
 #include <WiFi.h>
-#include <WiFiClient.h>
-#include <WiFiClientSecure.h>
 #include <WiFiUdp.h>
 #include <AddrList.h>
 
@@ -12,6 +10,9 @@
 
 #ifndef HTTP_CODE_OK
 #define HTTP_CODE_OK 200
+#endif
+#ifndef STATION_IF
+#define STATION_IF 0
 #endif
 
 //
@@ -77,7 +78,7 @@ IPAddress getIP6Address(int ifn=STATION_IF) {
     }
 
     // Final fall-back to the IPv6 wildcard address; [::]
-    return IP6_ADDR_ANY;
+    return INADDR_ANY;
 }
 
 void wifiScanCallback(int found);
@@ -138,14 +139,19 @@ void setup() {
 
     // Set up WiFi
     WiFi.mode(WIFI_STA); // Disable access point.
+    #ifdef ESP8266
     WiFi.softAPdisconnect(true);
     WiFi.setSleepMode(WIFI_NONE_SLEEP); // Disable sleep (In case we want broadcast(multicast) data)
     int networks_found = WiFi.scanNetworks(false, true);
+    #else
+    int networks_found = WiFi.scanNetworks();
+    #endif
 
     // Set hostname: UKHASnet-ESP-{node_id}-{chip_id}
-    WiFi.hostname(String("UKHASnet-ESP-") + node_id + "-" + String(ESP.getChipId(), HEX));
-    SERIAL_PRINT("Hostname: ");
-    SERIAL_PRINTLN(WiFi.hostname());
+    //uint8_t ___foo[WL_MAC_ADDR_LENGTH] = {0};
+    WiFi.setHostname((String("UKHASnet-ESP-") + String(node_id)).c_str() /*+ "-" + String(WiFi.macAddress(*___foo) & 0xffffff, HEX)*/);
+    //SERIAL_PRINT("Hostname: ");
+    //SERIAL_PRINTLN(WiFi.getHostname());
 
     SERIAL_PRINT("Connecting to ");
     SERIAL_PRINTLN(ssid);
@@ -399,7 +405,9 @@ void sendPacket() {
     switch (sequence) {
         case -1: // 'a', boot packet.
             sendbuf.add(":reset=");
+            #ifdef ESP8266
             sendbuf.add(ESP.getResetReason());
+            #endif
             break;
         case 0:
             // TODO: implement (M)ode flag, and submit patches upstream.
@@ -776,14 +784,26 @@ void wifiScanCallback(int found) {
             uploadbuf.add(",");
         }
         uploadbuf.add(F("{\"macAddress\":\""));
-        uploadbuf.add(WiFi.BSSIDstr(i));
+
+        uint8_t bssid[6] = {0,0,0,0,0,0};
+        WiFi.BSSID(i, bssid);
+        for (int j=0;j<6;j++) {
+            if (j) {
+                uploadbuf.add(':');
+            }
+            if (bssid[j] < 0x10) {
+                uploadbuf.add('0');
+            }
+            uploadbuf.add(String(bssid[j], HEX));
+        }
+
         uploadbuf.add(F("\",\"signalStrength\":"));
         uploadbuf.add(String(WiFi.RSSI(i)));
         uploadbuf.add(F(",\"channel\":"));
         uploadbuf.add(String(WiFi.channel(i)));
         uploadbuf.add(F("}"));
-        Serial.printf("%d: %s, Ch:%d (%ddBm) %s\r\n", i + 1, WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), WiFi.encryptionType(i) == ENC_TYPE_NONE ? "open" : "");
-        Serial1.printf("%d: %s, Ch:%d (%ddBm) %s\r\n", i + 1, WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), WiFi.encryptionType(i) == ENC_TYPE_NONE ? "open" : "");
+        Serial.printf("%d: %s, Ch:%d (%ddBm) %s\r\n", i + 1, WiFi.SSID(i), WiFi.channel(i), WiFi.RSSI(i), WiFi.encryptionType(i) == ENC_TYPE_NONE ? "open" : "");
+        Serial1.printf("%d: %s, Ch:%d (%ddBm) %s\r\n", i + 1, WiFi.SSID(i), WiFi.channel(i), WiFi.RSSI(i), WiFi.encryptionType(i) == ENC_TYPE_NONE ? "open" : "");
         //WiFi.BSSIDstr(i)
     }
     uploadbuf.add("]}");
@@ -796,7 +816,7 @@ void wifiScanCallback(int found) {
     client.setInsecure(); //! TODO: Verify SSL key.
 
     HTTPClient geoclient;
-    int res = geoclient.begin(client, "https://location.services.mozilla.com/v1/geolocate?key=test");
+    int res = geoclient.begin(client, String("https://location.services.mozilla.com/v1/geolocate?key=test"));
     Serial.println(res);
     res = geoclient.POST(uploadbuf.buf, uploadbuf.ptr);
     Serial.println(res);
