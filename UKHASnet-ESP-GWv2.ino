@@ -1,9 +1,8 @@
-#define _WIFI_LOGLEVEL_ 4
-#include <HTTPClient.h>
-
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <AddrList.h>
+
+//#include <HTTPClient.h>
 
 
 //#include <Ticker.h>
@@ -45,6 +44,8 @@ void rfm_reset() {
 }
 
 rfm_status_t resetRadio() {
+    pinMode(DIO1_pin, INPUT_PULLDOWN);
+
     // Set up UKHASnet
     Serial.println("Reseting RFM69....");
     rfm_reset();
@@ -125,6 +126,8 @@ void setup() {
     Serial.begin(115200);
     Serial1.begin(115200);
     delay(1000);
+    Serial.println();
+    Serial1.println();
 
     int config_status = readConfig();
     if (config_status != 0) {
@@ -214,7 +217,7 @@ float lastrssi = 0;
 
 WiFiClientSecure client;
 
-HTTPClient http;
+//HTTPClient http;
 
 void upload(bool fake=false);
 void upload(bool fake) {
@@ -227,10 +230,10 @@ void upload(bool fake) {
     init_global_buffers();
 
     if (not fake) {
-        http.setReuse(true);
+        //http.setReuse(true);
         Serial.println("Uploading...");
-        http.begin(api_url);
-        http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+        //http.begin(api_url);
+        //http.addHeader("Content-Type", "application/x-www-form-urlencoded");
     }
 
     uploadbuf.reset();
@@ -264,10 +267,10 @@ void upload(bool fake) {
     Serial.println();
 
     if (not fake) {
-        http.POST((const char*)uploadbuf.buf);
+        //http.POST((const char*)uploadbuf.buf);
 
-        http.writeToStream(&Serial);
-        http.end();
+        //http.writeToStream(&Serial);
+        //http.end();
     }
 
     Serial.println();
@@ -324,9 +327,9 @@ void multicast(IPAddress target) {
 
     uploadbuf.add(0x17); // Dict end
 
-    Udp.beginPacketMulticast(target, multicast_port, getIP6Address(), multicast_ttl);
-    Udp.write(uploadbuf.buf, uploadbuf.ptr);
-    Udp.endPacket();
+    //Udp.beginPacketMulticast(target, multicast_port, getIP6Address(), multicast_ttl);
+    //Udp.write(uploadbuf.buf, uploadbuf.ptr);
+    //Udp.endPacket();
 }
 
 /**
@@ -463,7 +466,7 @@ void sendPacket() {
 rfm_status_t res;
 void loop() {
     if (getTimeSince(packet_timer) >= packet_interval) {
-        sendPacket();
+        //sendPacket();
         packet_timer += packet_interval;
     }
 
@@ -812,6 +815,7 @@ void wifiScanCallback(int found) {
     Serial1.write(uploadbuf.buf, uploadbuf.ptr);
     Serial1.println();
 
+    /*
     WiFiClientSecure client; // , String("E5:FC:B7:1A:DD:08:DF:B0:E7:D8:7A:7C:62:92:E1:07:EF:26:96:C7")
     client.setInsecure(); //! TODO: Verify SSL key.
 
@@ -825,6 +829,7 @@ void wifiScanCallback(int found) {
     Serial.println(response);
     Serial1.println(response);
     geoclient.end();
+
 
     double lat = NAN;
     double lon = NAN;
@@ -880,4 +885,5 @@ void wifiScanCallback(int found) {
         latitude = lat;
         longitude = lon;
     }
+    */
 }

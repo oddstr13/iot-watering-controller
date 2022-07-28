@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include "http_server.h"
 
 #include "node_config.h"
@@ -147,9 +148,43 @@ void http_server_setup() {
         }
     });
 
-    F("asdf");
     server.on("/", HTTP_GET, []() {
-        server.send(200, F("text/html"), PSTR(INDEX_PAGE));
+        size_t page_size = strlen(INDEX_PAGE);
+        server.setContentLength(page_size);
+        server.send(200, F("text/html"), emptyString);
+
+        // WiFiClient does not know to chop up large socket writes,
+        // And the chip on the PicoW doesn't seem to like larger
+        // chunks than 2048. Packet(s) are sent right away,
+        // limited in size by MTU.
+        /*
+            01:25:37.570 -> :wr 85 0
+            01:25:37.570 -> :wrc 85 85 0
+            01:25:37.570 -> :ref 2
+            01:25:37.570 -> :wr 2048 0
+            01:25:37.570 -> :wrc 2048 2048 -1   // Error?
+            01:25:37.604 -> :ack 85
+            01:25:37.604 -> :wr 2048 0
+            01:25:37.604 -> :wrc 2048 2048 0    // 2048 bytes written to WiFi
+            01:25:37.637 -> :ack 1460           // TCP ACK
+            01:25:37.637 -> :ack 588
+            01:25:37.637 -> :wr 1803 0
+            01:25:37.637 -> :wrc 1803 1803 0
+            01:25:37.703 -> :ack 1460
+            01:25:37.703 -> :ack 343
+            01:25:37.703 -> :rcl pb=0 sz=-1
+            01:25:37.703 -> :abort
+        */
+        auto client = server.client();
+        const int chunksize = 1024;
+        int chunks = ceil((double)page_size / chunksize);
+        for (int i=0;i<chunks;i++) {
+            int position = i*chunksize;
+            int bytes_left = page_size - position;
+
+            client.write(&INDEX_PAGE[position], min(chunksize, bytes_left));
+            client.flush();
+        }
     });
 
     server.on("/config.json", HTTP_GET, handleConfig_GET);

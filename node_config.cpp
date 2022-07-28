@@ -22,7 +22,7 @@ bool tx_enabled = false;
 bool api_enabled = false;
 char api_url[256] = "http://www.ukhas.net/api/upload";
 
-bool multicast_enabled = true;
+bool multicast_enabled = false;
 char multicast_address[41] = "ff18::554b:4841:536e:6574:1";
 char multicast_address_other[41] = "ff18::554b:4841:536e:6574:2";
 uint16_t multicast_port = 20750;
