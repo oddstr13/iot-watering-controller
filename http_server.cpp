@@ -13,8 +13,8 @@
 
 WiFiWebServer server(80);
 
-#include <FS.h>
 #if ESP8266
+    #include <FS.h>
     FS* filesystem = &SPIFFS;
     #define fs(M) filesystem->M
 #else
@@ -213,6 +213,21 @@ void http_server_setup() {
             ipconfig.concat("\n");
         }
         server.send(200, F("text/plain"), ipconfig);
+    });
+
+    server.on("/list", HTTP_GET, []() {
+
+        String data;
+        Dir foo = LittleFS.openDir("/");
+        do {
+            data.concat(foo.fileName());
+            if (foo.isDirectory()) {
+                data.concat("/");
+            }
+            data.concat("\n");
+        } while (foo.next());
+
+        server.send(200, F("text/plain"), data);
     });
 
 

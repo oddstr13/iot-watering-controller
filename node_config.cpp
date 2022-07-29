@@ -1,5 +1,5 @@
 #include <wifi_credentials.h>
-#include <EEPROM.h>
+#include <LittleFS.h>
 
 #include <ArduinoJson.hpp>
 using namespace ArduinoJson;
@@ -147,10 +147,12 @@ int parseConfig(const JsonObject obj) {
 }
 
 int readConfig() {
-    EEPROM.begin(SPI_FLASH_SEC_SIZE);
+    LittleFS.begin();
+    auto filehandle = LittleFS.open("/config.json", "r");
 
     StaticJsonDocument<512> doc;
-    DeserializationError err = deserializeJson(doc, EEPROM.getConstDataPtr(), SPI_FLASH_SEC_SIZE);
+    DeserializationError err = deserializeJson(doc, filehandle);
+    filehandle.close();
 
     if (err) {
         return err.code();
@@ -202,14 +204,16 @@ void setConfig(JsonObject obj, bool include_password) {
 }
 
 bool saveConfig() {
-    Serial.print(F("Writing config to EEPROM..."));
-    EEPROM.begin(SPI_FLASH_SEC_SIZE);
+    Serial.print(F("Writing config to LittleFS..."));
+    LittleFS.begin();
 
     StaticJsonDocument<512> doc;
     setConfig(doc.to<JsonObject>());
 
-    serializeJson(doc, EEPROM.getDataPtr(), SPI_FLASH_SEC_SIZE);
-    EEPROM.commit();
+    auto filehandle = LittleFS.open("/config.json", "w");
+
+    serializeJson(doc, filehandle);
+    filehandle.close();
     Serial.println(F(" OK"));
     return true;
 }
