@@ -6,6 +6,7 @@
 #define _WIFI_LOGLEVEL_ 4
 #define USE_WIFI_NINA false
 #include <WiFiWebServer.h>
+#include <AddrList.h>
 
 #include <ArduinoJson.h>
 #include <StreamUtils.h>
@@ -154,9 +155,9 @@ void http_server_setup() {
         server.send(200, F("text/html"), emptyString);
 
         // WiFiClient does not know to chop up large socket writes,
-        // And the chip on the PicoW doesn't seem to like larger
-        // chunks than 2048. Packet(s) are sent right away,
-        // limited in size by MTU.
+        // and the chip on the PicoW doesn't seem to like larger
+        // chunks than TCP_MSS(1460) * 2. Packet(s) are sent right away,
+        // limited in size by TCP_MSS.
         /*
             01:25:37.570 -> :wr 85 0
             01:25:37.570 -> :wrc 85 85 0
@@ -175,17 +176,45 @@ void http_server_setup() {
             01:25:37.703 -> :rcl pb=0 sz=-1
             01:25:37.703 -> :abort
         */
-        auto client = server.client();
-        const int chunksize = 1024;
+        WiFiClient client = server.client();
+        const int chunksize = 2920;
         int chunks = ceil((double)page_size / chunksize);
         for (int i=0;i<chunks;i++) {
             int position = i*chunksize;
             int bytes_left = page_size - position;
 
-            client.write(&INDEX_PAGE[position], min(chunksize, bytes_left));
+            int written = client.write(&INDEX_PAGE[position], min(chunksize, bytes_left));
+            Serial.printf("%i bytes written.", written);
+            Serial.println();
             client.flush();
         }
     });
+
+    server.on("/ipconfig", HTTP_GET, []() {
+
+        String ipconfig;
+
+        // Print IP configuration..
+        for (auto a : addrList) {
+            ipconfig.concat(a.ifnumber());
+            ipconfig.concat(':');
+            ipconfig.concat(a.ifname());
+            ipconfig.concat(": ");
+            ipconfig.concat(a.isV4() ? "IPv4" : "IPv6");
+            ipconfig.concat(a.isLocal() ? " local " : " ");
+            ipconfig.concat(a.toString());
+
+            if (a.isLegacy()) {
+                ipconfig.concat(" mask:");
+                ipconfig.concat(a.netmask().toString());
+                ipconfig.concat(" gw:");
+                ipconfig.concat(a.gw().toString());
+            }
+            ipconfig.concat("\n");
+        }
+        server.send(200, F("text/plain"), ipconfig);
+    });
+
 
     server.on("/config.json", HTTP_GET, handleConfig_GET);
     server.on("/config.json", HTTP_PATCH, handleConfig_PATCH);

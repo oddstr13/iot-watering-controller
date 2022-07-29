@@ -125,7 +125,7 @@ void printNodeConfig() {
 void setup() {
     Serial.begin(115200);
     Serial1.begin(115200);
-    delay(1000);
+    delay(2000);
     Serial.println();
     Serial1.println();
 
@@ -164,6 +164,8 @@ void setup() {
     // Wait for IP address
     for (bool configured = false; !configured; ) {
         for (auto iface: addrList) {
+            //iface.addr().printTo(Serial);
+            //Serial.println();
             if (configured = !iface.addr().isLocal()) {
                 break;
             }
