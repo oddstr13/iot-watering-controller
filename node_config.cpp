@@ -204,6 +204,8 @@ void setConfig(JsonObject obj, bool include_password) {
 }
 
 bool saveConfig() {
+    // TODO: Check if config changed, and don't write if it is the same.
+    // The ESP8266 EEPROM library did this internally, haven't chekced LittleFS.
     Serial.print(F("Writing config to LittleFS..."));
     LittleFS.begin();
 

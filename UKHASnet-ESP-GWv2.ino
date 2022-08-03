@@ -4,6 +4,9 @@
 
 //#include <HTTPClient.h>
 
+#include <cyw43_stats.h>
+#include <lwip/stats.h>
+#define STAT(name) String(#name " rx=") + String(lwip_stats.name.recv) + String(" tx=") + String(lwip_stats.name.xmit) + String(" drop=") + String(lwip_stats.name.drop) + String("\r\n")
 
 //#include <Ticker.h>
 
@@ -64,6 +67,7 @@ rfm_status_t resetRadio() {
 }
 
 IPAddress getIP6Address(int ifn=STATION_IF) {
+
     // Prefer non-local address
     for (auto a: addrList) {
         if (a.ifnumber() == ifn && a.addr().isV6() && !a.addr().isLocal()) {
@@ -470,10 +474,24 @@ void loop() {
     if (getTimeSince(packet_timer) >= packet_interval) {
         //sendPacket();
         packet_timer += packet_interval;
+
+        Serial.println();
+        Serial.println(String("cyw43 in=") + String(cyw43_stats[CYW43_STAT_PACKET_IN_COUNT])
+          + String(" out=") + String(cyw43_stats[CYW43_STAT_PACKET_OUT_COUNT]));
+        Serial.print(STAT(etharp));
+        Serial.print(STAT(ip));
+        Serial.print(STAT(ip6));
+        Serial.print(STAT(tcp));
+        Serial.print(STAT(udp));
+        Serial.print(STAT(icmp));
+        Serial.print(STAT(icmp6));
+        Serial.print(STAT(nd6));
+        Serial.print(STAT(mld6));
     }
 
     http_server_update();
 
+    /*
     if (rfm_status == RFM_OK || resetRadioRatelimited() == RFM_OK) {
         // TODO: Add timeout parameter to rf69_receive_long, to allow other tasks to run (outside of yield())
         res = rf69_receive_long(databuf, &dataptr, &lastrssi, &packet_received, databuf_LEN, DIO1_pin, 100);
@@ -530,6 +548,7 @@ void loop() {
     } else {
         Serial1.println("rfm_status is not RFM_OK, even after radio reset, skipping RX.");
     }
+    */
 /*
     uint32_t free;
     uint16_t max;

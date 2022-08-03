@@ -11,6 +11,11 @@
 #include <ArduinoJson.h>
 #include <StreamUtils.h>
 
+#include <cyw43_stats.h>
+#include <lwip/stats.h>
+#define STAT(name) (String(#name " rx=") + String(lwip_stats.name.recv) + String(" tx=") + String(lwip_stats.name.xmit) + String(" drop=") + String(lwip_stats.name.drop) + String("\r\n"))
+
+
 WiFiWebServer server(80);
 
 #if ESP8266
@@ -27,6 +32,12 @@ WiFiWebServer server(80);
 static const char INDEX_PAGE[] PROGMEM = ""
 #include "index.html.h"
 ;
+
+/*
+static const char NRK_PAGE[] PROGMEM = ""
+#include "nrk.html.h"
+;
+*/
 
 String emptyString = String();
 
@@ -149,7 +160,21 @@ void http_server_setup() {
         }
     });
 
+    /*
+    server.on("/nrk", HTTP_GET, []() {
+        size_t page_size = strlen(NRK_PAGE);
+        server.setContentLength(page_size);
+        server.send(200, F("text/html"), emptyString);
+
+        WiFiClient client = server.client();
+        client.write(NRK_PAGE, page_size);
+    });
+    */
+
     server.on("/", HTTP_GET, []() {
+        #if 1
+        server.send(200, F("text/html"), PSTR(INDEX_PAGE));
+        #else
         size_t page_size = strlen(INDEX_PAGE);
         server.setContentLength(page_size);
         server.send(200, F("text/html"), emptyString);
@@ -177,7 +202,7 @@ void http_server_setup() {
             01:25:37.703 -> :abort
         */
         WiFiClient client = server.client();
-        const int chunksize = 2920;
+        const int chunksize = 2922;
         int chunks = ceil((double)page_size / chunksize);
         for (int i=0;i<chunks;i++) {
             int position = i*chunksize;
@@ -188,6 +213,7 @@ void http_server_setup() {
             Serial.println();
             client.flush();
         }
+        #endif
     });
 
     server.on("/ipconfig", HTTP_GET, []() {
@@ -228,6 +254,25 @@ void http_server_setup() {
         } while (foo.next());
 
         server.send(200, F("text/plain"), data);
+    });
+
+
+    server.on("/stats", HTTP_GET, []() {
+        server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+        server.send(200, F("text/plain"), emptyString);
+        server.sendContent(STAT(etharp));
+        server.sendContent(STAT(tcp));
+        server.sendContent(STAT(udp));
+        server.sendContent(STAT(ip));
+        server.sendContent(STAT(icmp));
+        server.sendContent(STAT(ip6));
+        server.sendContent(STAT(nd6));
+        server.sendContent(STAT(icmp6));
+        server.sendContent(STAT(mld6));
+        server.sendContent(
+            String("cyw43 in=") + String(cyw43_stats[CYW43_STAT_PACKET_IN_COUNT])
+          + String(" out=") + String(cyw43_stats[CYW43_STAT_PACKET_OUT_COUNT]) + String("\r\n")
+        );
     });
 
 
