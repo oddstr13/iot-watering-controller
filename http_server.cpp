@@ -33,12 +33,6 @@ static const char INDEX_PAGE[] PROGMEM = ""
 #include "index.html.h"
 ;
 
-/*
-static const char NRK_PAGE[] PROGMEM = ""
-#include "nrk.html.h"
-;
-*/
-
 String emptyString = String();
 
 String getContentType(String filename) {
@@ -159,17 +153,6 @@ void http_server_setup() {
             server.send(204);
         }
     });
-
-    /*
-    server.on("/nrk", HTTP_GET, []() {
-        size_t page_size = strlen(NRK_PAGE);
-        server.setContentLength(page_size);
-        server.send(200, F("text/html"), emptyString);
-
-        WiFiClient client = server.client();
-        client.write(NRK_PAGE, page_size);
-    });
-    */
 
     server.on("/", HTTP_GET, []() {
         #if 1
