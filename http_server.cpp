@@ -269,10 +269,12 @@ void http_server_setup() {
         server.sendContent(STAT(nd6));
         server.sendContent(STAT(icmp6));
         server.sendContent(STAT(mld6));
+        /*
         server.sendContent(
             String("cyw43 in=") + String(cyw43_stats[CYW43_STAT_PACKET_IN_COUNT])
           + String(" out=") + String(cyw43_stats[CYW43_STAT_PACKET_OUT_COUNT]) + String("\r\n")
         );
+        */
     });
 
 

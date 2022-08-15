@@ -150,7 +150,8 @@ void setup() {
     WiFi.softAPdisconnect(true);
     WiFi.setSleepMode(WIFI_NONE_SLEEP); // Disable sleep (In case we want broadcast(multicast) data)
     int networks_found = WiFi.scanNetworks(false, true);
-    #else
+    #elif defined(ARDUINO_RASPBERRY_PI_PICO_W)
+    WiFi.noLowPowerMode();
     int networks_found = WiFi.scanNetworks();
     #endif
 
@@ -333,9 +334,12 @@ void multicast(IPAddress target) {
 
     uploadbuf.add(0x17); // Dict end
 
-    //Udp.beginPacketMulticast(target, multicast_port, getIP6Address(), multicast_ttl);
-    //Udp.write(uploadbuf.buf, uploadbuf.ptr);
-    //Udp.endPacket();
+    //IPAddress addr = IPAddress();
+    //addr.fromString("10.0.0.1");
+    //Udp.beginPacket(addr, multicast_port);
+    Udp.beginPacketMulticast(target, multicast_port, getIP6Address(), multicast_ttl);
+    Udp.write(uploadbuf.buf, uploadbuf.ptr);
+    Udp.endPacket();
 }
 
 /**
@@ -472,12 +476,14 @@ void sendPacket() {
 rfm_status_t res;
 void loop() {
     if (getTimeSince(packet_timer) >= packet_interval) {
-        //sendPacket();
+        sendPacket();
         packet_timer += packet_interval;
 
         Serial.println();
+        /*
         Serial.println(String("cyw43 in=") + String(cyw43_stats[CYW43_STAT_PACKET_IN_COUNT])
           + String(" out=") + String(cyw43_stats[CYW43_STAT_PACKET_OUT_COUNT]));
+        */
         Serial.print(STAT(etharp));
         Serial.print(STAT(ip));
         Serial.print(STAT(ip6));
