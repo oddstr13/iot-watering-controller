@@ -425,7 +425,7 @@ void sendPacket() {
         case 1: // 'c'
             //break;
         default:
-            if (latitude != NAN and longitude != NAN) {
+            if (!isnan(latitude) and !isnan(longitude)) {
                 sendbuf.add('L'); // TODO: Add Wifi based location.
                 sendbuf.add(String(latitude, 5));
                 sendbuf.add(',');
