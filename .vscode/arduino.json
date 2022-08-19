@@ -2,5 +2,5 @@
     "board": "pico:rp2040:rpipicow",
     "configuration": "flash=2097152_65536,freq=133,opt=Small,rtti=Disabled,stackprotect=Disabled,exceptions=Enabled,dbgport=Serial,dbglvl=Core,usbstack=picosdk,ipstack=ipv4ipv6",
     "port": "/dev/ttyACM0",
-    "sketch": "UKHASnet-ESP-GWv2.ino"
+    "sketch": "iot-watering-controller.ino"
 }
