@@ -17,54 +17,13 @@
 #define STATION_IF 0
 #endif
 
-//
-#include "radio_config.h"
-#include <UKHASnetRFM69.h>
-
 #include <Buffer.h>
 #include <iso646.h>
 
 #include "node_config.h"
 #include "global_buffers.h"
-
+#include "openshell_utils.h"
 #include "http_server.h"
-
-volatile bool transmitting_packet = false;
-
-int rfmCSPin = 0;
-int rfmResetPin = 15;
-
-int ukh_seq = 0;
-
-rfm_status_t rfm_status;
-
-void rfm_reset() {
-    pinMode(rfmResetPin, OUTPUT);
-    digitalWrite(rfmResetPin, HIGH);
-    delay(5);
-    digitalWrite(rfmResetPin, LOW);
-    delay(20);
-}
-
-rfm_status_t resetRadio() {
-    pinMode(DIO1_pin, INPUT_PULLDOWN);
-
-    // Set up UKHASnet
-    Serial.println("Reseting RFM69....");
-    rfm_reset();
-    Serial.println("Initiating RFM69....");
-    rfm_status = rf69_init(rfmCSPin);
-    Serial.print("RFM69 status: ");
-    Serial.println(rfm_status);
-
-    if (rfm_status == RFM_OK) {
-        delay(200);
-        ////rf69_burst_write(RFM69_REG_07_FRF_MSB, (rfm_reg_t*)"\xD9\x60\x12", 3);
-        dump_rfm69_registers();
-    }
-
-    return rfm_status;
-}
 
 IPAddress getIP6Address(int ifn=STATION_IF) {
 
@@ -157,7 +116,7 @@ void setup() {
 
     // Set hostname: UKHASnet-ESP-{node_id}-{chip_id}
     //uint8_t ___foo[WL_MAC_ADDR_LENGTH] = {0};
-    WiFi.setHostname((String("UKHASnet-ESP-") + String(node_id)).c_str() /*+ "-" + String(WiFi.macAddress(*___foo) & 0xffffff, HEX)*/);
+    WiFi.setHostname((String("ESP-") + String(node_id)).c_str() /*+ "-" + String(WiFi.macAddress(*___foo) & 0xffffff, HEX)*/);
     //SERIAL_PRINT("Hostname: ");
     //SERIAL_PRINTLN(WiFi.getHostname());
 
@@ -204,8 +163,6 @@ void setup() {
 
     http_server_setup();
 
-    // Setup UKHASnet
-    rfm_status = resetRadio();
     // Should make it transmit a packet right now, then next after packet_interval
     packet_timer = millis() - packet_interval;
 
@@ -342,65 +299,6 @@ void multicast(IPAddress target) {
     Udp.endPacket();
 }
 
-/**
- * Checks if buf matches minimum requirements for UKHASnet packet.
- * @param buf A pointer to buffer to test content of
- * @param len Length of packet in buffer
- * @returns true if matching, false if not.
- */
-bool isUkhasnetPacket(uint8_t *buf, uint16_t len) {
-    //! Minimum packet to pass: 0a[Q]
-    //* Path can contain any character and be any length.
-    //* Data field validity (or existence) not tested.
-    // Minimum length
-    if (len < 5) { // 0a[Q]
-        return false;
-    }
-
-    // TTL:
-    if (buf[0] < '0' or buf[0] > '9') {
-        return false;
-    }
-
-    // Sequence:
-    if (buf[1] < 'a' or buf[1] > 'z') {
-        return false;
-    }
-
-    /*
-     Packet:    9aV3.3[Q]
-     i:         012345678
-     len:       123456789
-    */
-    // Hops
-    if (buf[len-1] != ']') {
-        return false;
-    }
-    // 9a V3.3[ Q]
-    bool found = false;
-    for (uint16_t i=len-2; i>1; i--) {
-        if (buf[i] == '[') {
-            found = true;
-            break;
-        }
-    }
-    if (not found) {
-        return false;
-    }
-
-    return true;
-}
-
-bool _ratelimit_firstrun = true;
-unsigned long _last_reset_radio = 0;
-rfm_status_t resetRadioRatelimited() {
-    if (_ratelimit_firstrun || rfm_status == RFM_OK || getTimeSince(_last_reset_radio) >= 15000) {
-        resetRadio();
-        _last_reset_radio = millis();
-        _ratelimit_firstrun = false;
-    }
-    return rfm_status;
-}
 
 int sequence = -1;
 Buffer sendbuf;
@@ -459,21 +357,11 @@ void sendPacket() {
     Serial.write(sendbuf.buf, sendbuf.ptr);
     Serial.println();
 
-    // Transmit packet. 10dBm (10mW)
-    if (tx_enabled) {
-        if (rfm_status == RFM_OK || resetRadio() == RFM_OK) {
-            rf69_send_long(sendbuf.buf, sendbuf.ptr, 10, DIO1_pin);
-        } else {
-            SERIAL_PRINTLN("rfm_status is not RFM_OK, even after radio reset, skipping TX.");
-        }
-    }
-
     // Increment sequence for next time.
     sequence = (sequence + 1) % 25;
     //* Sequence goes 'b'-'z', with 'a' transmitted as first packet after boot.
 }
 
-rfm_status_t res;
 void loop() {
     if (getTimeSince(packet_timer) >= packet_interval) {
         sendPacket();
@@ -498,23 +386,6 @@ void loop() {
     http_server_update();
 
     /*
-    if (rfm_status == RFM_OK || resetRadioRatelimited() == RFM_OK) {
-        // TODO: Add timeout parameter to rf69_receive_long, to allow other tasks to run (outside of yield())
-        res = rf69_receive_long(databuf, &dataptr, &lastrssi, &packet_received, databuf_LEN, DIO1_pin, 100);
-
-        if (res == RFM_OK) {
-            Serial.print("Result: ");
-            Serial.println(res, DEC);
-
-            Serial.print("RSSI: ");
-            Serial.println(lastrssi);
-
-            Serial.print("Bytes: ");
-            Serial.println(dataptr, DEC);
-
-            Serial.print("Waiting: ");
-            Serial.println(packet_received ? "true" : "false");
-
             if (isUkhasnetPacket(databuf, dataptr)) {
                 Serial.write(databuf, dataptr);
                 Serial.println();
@@ -524,278 +395,7 @@ void loop() {
                 multicast(multicast_ip_other);
                 upload(true);
             }
-
-        } else if (res == RFM_TIMEOUT) {
-        } else {
-            Serial.print(F("RFM RX Error: "));
-        }
-
-        switch (res) {
-            case RFM_OK:
-                Serial1.println(F("RFM_OK"));
-                break;
-            case RFM_FAIL:
-                SERIAL_PRINTLN(F("RFM_FAIL"));
-                break;
-            case RFM_TIMEOUT:
-                Serial1.println(F("RFM_TIMEOUT"));
-                break;
-            case RFM_CRC_ERROR:
-                SERIAL_PRINTLN(F("RFM_CRC_ERROR"));
-                break;
-            case RFM_BUFFER_OVERFLOW:
-                SERIAL_PRINTLN(F("RFM_BUFFER_OVERFLOW"));
-                break;
-            default:
-                Serial1.print(F("Unknown RFM return code: "));
-                Serial1.println(res);
-                Serial.println(res);
-        }
-    } else {
-        Serial1.println("rfm_status is not RFM_OK, even after radio reset, skipping RX.");
-    }
     */
-/*
-    uint32_t free;
-    uint16_t max;
-    uint8_t frag;
-    ESP.getHeapStats(&free, &max, &frag);
-    Serial.print(F("free: "));
-    Serial.print(free);
-    Serial.print(F(", max: "));
-    Serial.print(max);
-    Serial.print(F(", frag: "));
-    Serial.print(frag);
-    Serial.print(F(", stack: "));
-    Serial.println(ESP.getFreeContStack());
-    */
-}
-
-void dump_rfm69_registers() {
-    rfm_reg_t result;
-
-    rf69_read(RFM69_REG_01_OPMODE, &result);
-    Serial.print(F("REG_01_OPMODE: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_02_DATA_MODUL, &result);
-    Serial.print(F("REG_02_DATA_MODUL: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_03_BITRATE_MSB, &result);
-    Serial.print(F("REG_03_BITRATE_MSB: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_04_BITRATE_LSB, &result);
-    Serial.print(F("REG_04_BITRATE_LSB: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_05_FDEV_MSB, &result);
-    Serial.print(F("REG_05_FDEV_MSB: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_06_FDEV_LSB, &result);
-    Serial.print(F("REG_06_FDEV_LSB: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_07_FRF_MSB, &result);
-    Serial.print(F("REG_07_FRF_MSB: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_08_FRF_MID, &result);
-    Serial.print(F("REG_08_FRF_MID: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_09_FRF_LSB, &result);
-    Serial.print(F("REG_09_FRF_LSB: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_0A_OSC1, &result);
-    Serial.print(F("REG_0A_OSC1: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_0B_AFC_CTRL, &result);
-    Serial.print(F("REG_0B_AFC_CTRL: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_0D_LISTEN1, &result);
-    Serial.print(F("REG_0D_LISTEN1: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_0E_LISTEN2, &result);
-    Serial.print(F("REG_0E_LISTEN2: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_0F_LISTEN3, &result);
-    Serial.print(F("REG_0F_LISTEN3: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_10_VERSION, &result);
-    Serial.print(F("REG_10_VERSION: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_11_PA_LEVEL, &result);
-    Serial.print(F("REG_11_PA_LEVEL: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_12_PA_RAMP, &result);
-    Serial.print(F("REG_12_PA_RAMP: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_13_OCP, &result);
-    Serial.print(F("REG_13_OCP: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_18_LNA, &result);
-    Serial.print(F("REG_18_LNA: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_19_RX_BW, &result);
-    Serial.print(F("REG_19_RX_BW: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_1A_AFC_BW, &result);
-    Serial.print(F("REG_1A_AFC_BW: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_1B_OOK_PEAK, &result);
-    Serial.print(F("REG_1B_OOK_PEAK: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_1C_OOK_AVG, &result);
-    Serial.print(F("REG_1C_OOK_AVG: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_1D_OOF_FIX, &result);
-    Serial.print(F("REG_1D_OOF_FIX: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_1E_AFC_FEI, &result);
-    Serial.print(F("REG_1E_AFC_FEI: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_1F_AFC_MSB, &result);
-    Serial.print(F("REG_1F_AFC_MSB: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_20_AFC_LSB, &result);
-    Serial.print(F("REG_20_AFC_LSB: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_21_FEI_MSB, &result);
-    Serial.print(F("REG_21_FEI_MSB: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_22_FEI_LSB, &result);
-    Serial.print(F("REG_22_FEI_LSB: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_23_RSSI_CONFIG, &result);
-    Serial.print(F("REG_23_RSSI_CONFIG: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_24_RSSI_VALUE, &result);
-    Serial.print(F("REG_24_RSSI_VALUE: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_25_DIO_MAPPING1, &result);
-    Serial.print(F("REG_25_DIO_MAPPING1: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_26_DIO_MAPPING2, &result);
-    Serial.print(F("REG_26_DIO_MAPPING2: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_27_IRQ_FLAGS1, &result);
-    Serial.print(F("REG_27_IRQ_FLAGS1: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_28_IRQ_FLAGS2, &result);
-    Serial.print(F("REG_28_IRQ_FLAGS2: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_29_RSSI_THRESHOLD, &result);
-    Serial.print(F("REG_29_RSSI_THRESHOLD: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_2A_RX_TIMEOUT1, &result);
-    Serial.print(F("REG_2A_RX_TIMEOUT1: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_2B_RX_TIMEOUT2, &result);
-    Serial.print(F("REG_2B_RX_TIMEOUT2: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_2C_PREAMBLE_MSB, &result);
-    Serial.print(F("REG_2C_PREAMBLE_MSB: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_2D_PREAMBLE_LSB, &result);
-    Serial.print(F("REG_2D_PREAMBLE_LSB: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_2E_SYNC_CONFIG, &result);
-    Serial.print(F("REG_2E_SYNC_CONFIG: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_2F_SYNCVALUE1, &result);
-    Serial.print(F("REG_2F_SYNCVALUE1: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_30_SYNCVALUE2, &result);
-    Serial.print(F("REG_30_SYNCVALUE2: 0x"));
-    Serial.println(result, HEX);
-
-    /* Sync values 1-8 go here */
-    rf69_read(RFM69_REG_37_PACKET_CONFIG1, &result);
-    Serial.print(F("REG_37_PACKET_CONFIG1: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_38_PAYLOAD_LENGTH, &result);
-    Serial.print(F("REG_38_PAYLOAD_LENGTH: 0x"));
-    Serial.println(result, HEX);
-
-    /* Node address, broadcast address go here */
-    rf69_read(RFM69_REG_3B_AUTOMODES, &result);
-    Serial.print(F("REG_3B_AUTOMODES: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_3C_FIFO_THRESHOLD, &result);
-    Serial.print(F("REG_3C_FIFO_THRESHOLD: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_3D_PACKET_CONFIG2, &result);
-    Serial.print(F("REG_3D_PACKET_CONFIG2: 0x"));
-    Serial.println(result, HEX);
-
-    /* AES Key 1-16 go here */
-    rf69_read(RFM69_REG_4E_TEMP1, &result);
-    Serial.print(F("REG_4E_TEMP1: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_4F_TEMP2, &result);
-    Serial.print(F("REG_4F_TEMP2: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_58_TEST_LNA, &result);
-    Serial.print(F("REG_58_TEST_LNA: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_5A_TEST_PA1, &result);
-    Serial.print(F("REG_5A_TEST_PA1: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_5C_TEST_PA2, &result);
-    Serial.print(F("REG_5C_TEST_PA2: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_6F_TEST_DAGC, &result);
-    Serial.print(F("REG_6F_TEST_DAGC: 0x"));
-    Serial.println(result, HEX);
-
-    rf69_read(RFM69_REG_71_TEST_AFC, &result);
-    Serial.print(F("REG_71_TEST_AFC: 0x"));
-    Serial.println(result, HEX);
 }
 
 void wifiScanCallback(int found) {
